@@ -269,6 +269,15 @@ with col1:
 with col2:
     openchat_url = settings.get('kakao_openchat_url', '')
     if openchat_url:
-        st.link_button("💬\n오픈채팅", openchat_url, use_container_width=True)
+        st.link_button("💬 오픈채팅", openchat_url, use_container_width=True)
     else:
-        st.link_bu
+        phone_clean = manager_phone.replace('-','')
+        st.link_button("📞 전화문의", f"tel:{phone_clean}", use_container_width=True)
+with col3:
+    if office_address:
+        import urllib.parse
+        encoded_address = urllib.parse.quote(office_address)
+        map_url = f"https://map.kakao.com/?q={encoded_address}"
+        st.link_button("🗺️ 오시는 길", map_url, use_container_width=True)
+    else:
+        st.link_button("🗺️ 오시는 길", "https://map.kakao.com/", use_container_width=True)
