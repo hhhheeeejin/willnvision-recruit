@@ -16,7 +16,6 @@ from utils.db import (
 st.set_page_config(page_title="관리자", page_icon="🔐", layout="wide")
 
 
-# ============ 비밀번호 보호 ============
 def check_password():
     def password_entered():
         if st.session_state["password"] == st.secrets["ADMIN_PASSWORD"]:
@@ -38,11 +37,9 @@ def check_password():
 
 check_password()
 
-# ============ 메인 ============
 st.title("🔐 윌앤비전 채용 관리자")
 st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-# ============ 탭 구성 (7개) ============
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📊 대시보드",
     "📋 공고 관리",
@@ -69,14 +66,11 @@ with tab1:
     
     st.divider()
     
-    # 🏆 공고별 상세 통계 (문의 vs 지원 비교)
     st.subheader("🏆 공고별 통계")
     st.caption("각 공고가 얼마나 관심받았는지, 실제 지원까지 이어졌는지 확인")
     
     all_jobs_stats = get_all_jobs()
     if all_jobs_stats:
-        import pandas as pd
-        
         stats_data = []
         for job in all_jobs_stats:
             view_count = job.get('view_count') or 0
@@ -116,19 +110,6 @@ with tab1:
         st.subheader("⚠️ 담당자 연결 필요")
         st.metric("담당자 연결 요청", f"{stats['needs_human_count']:,}건")
         st.caption("AI가 답변 못한 질문들입니다. 💬 대화기록 탭에서 확인하세요.")
-    
-    st.divider()
-    
-    st.subheader("📈 최근 활동")
-    conversations = get_all_conversations()
-    if conversations:
-        now = datetime.now()
-        recent = [c for c in conversations if datetime.fromisoformat(c['created_at'].replace('Z', '+00:00')).replace(tzinfo=None) > now - timedelta(days=7)]
-        
-        col1, col2 = st.columns(2)
-        col1.metric("📅 최근 7일 대화", f"{len(recent)}건")
-        col2.metric("🎯 전환율 (대화→지원)", 
-                   f"{(stats['applicants_total']/stats['unique_visitors']*100):.1f}%" if stats['unique_visitors'] > 0 else "0%")
 
 # =============================================================
 # TAB 2: 공고 관리
@@ -136,14 +117,12 @@ with tab1:
 with tab2:
     st.subheader("📋 공고 관리")
     
-    # 새 공고 추가
     with st.expander("➕ 새 공고 추가하기"):
         with st.form("new_job_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             new_title = col1.text_input("직군명 *", placeholder="예: 인바운드 상담원")
             new_category = col2.selectbox("카테고리", ["IB상담", "OB상담", "채팅상담", "사무직", "기타"])
             
-            # 🏢 센터 선택
             active_centers = get_active_centers()
             if active_centers:
                 center_options = {c['id']: c['name'] for c in active_centers}
@@ -176,11 +155,11 @@ with tab2:
             new_form_url = col1.text_input("구글폼 URL", placeholder="https://forms.gle/...")
             new_chat_url = col2.text_input("오픈채팅 URL", placeholder="https://open.kakao.com/...")
             
-            # 이미지 업로드
             st.markdown("**🖼️ 이미지 (선택)**")
             img_method = st.radio("이미지 추가 방식", ["없음", "파일 업로드", "URL 입력"], horizontal=True)
             
             new_image_url = ""
+            uploaded_file = None
             if img_method == "파일 업로드":
                 uploaded_file = st.file_uploader("이미지 선택", type=["png", "jpg", "jpeg"], key="new_img")
                 if uploaded_file:
@@ -231,7 +210,6 @@ with tab2:
     
     st.divider()
     
-    # 기존 공고 목록 & 수정
     st.markdown("### 📋 등록된 공고 목록")
     jobs = get_all_jobs()
     
@@ -245,15 +223,14 @@ with tab2:
                 
                 with st.form(f"edit_job_{job['id']}"):
                     col1, col2 = st.columns(2)
-                    ed_title = col1.text_input("직군명", value=job['title'] or "")
+                    ed_title = col1.text_input("직군명", value=job['title'] or "", key=f"job_title_{job['id']}")
                     ed_category = col2.selectbox(
                         "카테고리",
                         ["IB상담", "OB상담", "채팅상담", "사무직", "기타"],
                         index=["IB상담", "OB상담", "채팅상담", "사무직", "기타"].index(job['category']) if job.get('category') in ["IB상담", "OB상담", "채팅상담", "사무직", "기타"] else 0,
-                        key=f"cat_{job['id']}"
+                        key=f"job_cat_{job['id']}"
                     )
                     
-                    # 🏢 센터 선택 (수정)
                     active_centers_list = get_active_centers()
                     if active_centers_list:
                         center_opts = {c['id']: c['name'] for c in active_centers_list}
@@ -266,32 +243,31 @@ with tab2:
                             options=list(center_opts.keys()),
                             format_func=lambda x: center_opts[x],
                             index=current_idx,
-                            key=f"center_{job['id']}",
+                            key=f"job_center_{job['id']}",
                         )
                     else:
                         ed_center_id = job.get('center_id')
                     
                     col1, col2, col3 = st.columns(3)
-                    ed_subway_line = col1.text_input("노선", value=job.get('subway_line') or "")
-                    ed_subway_station = col2.text_input("역", value=job.get('subway_station') or "")
-                    ed_location = col3.text_input("근무지", value=job.get('location') or "")
+                    ed_subway_line = col1.text_input("노선", value=job.get('subway_line') or "", key=f"job_line_{job['id']}")
+                    ed_subway_station = col2.text_input("역", value=job.get('subway_station') or "", key=f"job_stn_{job['id']}")
+                    ed_location = col3.text_input("근무지", value=job.get('location') or "", key=f"job_loc_{job['id']}")
                     
                     col1, col2 = st.columns(2)
-                    ed_salary = col1.text_input("급여", value=job.get('salary') or "")
-                    ed_hours = col2.text_input("근무시간", value=job.get('work_hours') or "")
+                    ed_salary = col1.text_input("급여", value=job.get('salary') or "", key=f"job_sal_{job['id']}")
+                    ed_hours = col2.text_input("근무시간", value=job.get('work_hours') or "", key=f"job_hrs_{job['id']}")
                     
                     col1, col2 = st.columns(2)
-                    ed_days = col1.text_input("근무요일", value=job.get('work_days') or "")
-                    ed_education = col2.text_input("교육", value=job.get('education_period') or "")
+                    ed_days = col1.text_input("근무요일", value=job.get('work_days') or "", key=f"job_days_{job['id']}")
+                    ed_education = col2.text_input("교육", value=job.get('education_period') or "", key=f"job_edu_{job['id']}")
                     
-                    ed_features = st.text_input("특징", value=job.get('features') or "")
-                    ed_description = st.text_area("설명", value=job.get('description') or "")
+                    ed_features = st.text_input("특징", value=job.get('features') or "", key=f"job_feat_{job['id']}")
+                    ed_description = st.text_area("설명", value=job.get('description') or "", key=f"job_desc_{job['id']}")
                     
                     col1, col2 = st.columns(2)
-                    ed_form_url = col1.text_input("구글폼 URL", value=job.get('google_form_url') or "")
-                    ed_chat_url = col2.text_input("오픈채팅 URL", value=job.get('open_chat_url') or "")
+                    ed_form_url = col1.text_input("구글폼 URL", value=job.get('google_form_url') or "", key=f"job_form_{job['id']}")
+                    ed_chat_url = col2.text_input("오픈채팅 URL", value=job.get('open_chat_url') or "", key=f"job_chat_{job['id']}")
                     
-                    # 이미지 수정
                     st.markdown("**🖼️ 이미지 수정**")
                     img_action = st.radio(
                         "이미지",
@@ -312,9 +288,9 @@ with tab2:
                         "상태",
                         ["모집중", "마감", "재오픈예정"],
                         index=["모집중", "마감", "재오픈예정"].index(job['status']),
-                        key=f"status_{job['id']}"
+                        key=f"job_status_{job['id']}"
                     )
-                    ed_order = col2.number_input("순서", min_value=0, value=job.get('display_order') or 0, key=f"order_{job['id']}")
+                    ed_order = col2.number_input("순서", min_value=0, value=job.get('display_order') or 0, key=f"job_order_{job['id']}")
                     
                     col1, col2, col3 = st.columns(3)
                     save_btn = col1.form_submit_button("💾 저장", type="primary", use_container_width=True)
@@ -362,13 +338,12 @@ with tab2:
                             st.error(f"삭제 실패: {e}")
 
 # =============================================================
-# TAB 3: 센터 관리 (NEW!)
+# TAB 3: 센터 관리
 # =============================================================
 with tab3:
     st.subheader("🏢 센터 관리")
     st.caption("근무지(센터)를 추가/수정합니다. 각 공고는 하나의 센터에 연결됩니다.")
     
-    # 새 센터 추가
     with st.expander("➕ 새 센터 추가"):
         with st.form("new_center_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -415,7 +390,6 @@ with tab3:
     
     st.divider()
     
-    # 기존 센터 목록
     st.markdown("### 📋 등록된 센터")
     centers = get_all_centers()
     
@@ -427,22 +401,22 @@ with tab3:
             with st.expander(f"**{c['name']}** — {status_badge}", expanded=False):
                 with st.form(f"edit_center_{c['id']}"):
                     col1, col2 = st.columns(2)
-                    ec_name = col1.text_input("이름", value=c['name'])
-                    ec_phone = col2.text_input("연락처", value=c.get('phone') or "")
+                    ec_name = col1.text_input("이름", value=c['name'], key=f"ctr_name_{c['id']}")
+                    ec_phone = col2.text_input("연락처", value=c.get('phone') or "", key=f"ctr_phone_{c['id']}")
                     
-                    ec_address = st.text_input("주소", value=c['address'])
-                    ec_detail = st.text_input("상세 안내", value=c.get('detail_address') or "")
+                    ec_address = st.text_input("주소", value=c['address'], key=f"ctr_addr_{c['id']}")
+                    ec_detail = st.text_input("상세 안내", value=c.get('detail_address') or "", key=f"ctr_detail_{c['id']}")
                     
                     col1, col2 = st.columns(2)
-                    ec_subway = col1.text_input("지하철", value=c.get('subway_info') or "")
-                    ec_bus = col2.text_input("버스", value=c.get('bus_info') or "")
+                    ec_subway = col1.text_input("지하철", value=c.get('subway_info') or "", key=f"ctr_subway_{c['id']}")
+                    ec_bus = col2.text_input("버스", value=c.get('bus_info') or "", key=f"ctr_bus_{c['id']}")
                     
-                    ec_desc = st.text_area("설명", value=c.get('description') or "")
+                    ec_desc = st.text_area("설명", value=c.get('description') or "", key=f"ctr_desc_{c['id']}")
                     
                     col1, col2, col3 = st.columns(3)
-                    ec_parking = col1.checkbox("🚗 주차 가능", value=c.get('parking_available', False), key=f"parking_{c['id']}")
-                    ec_active = col2.checkbox("✅ 활성화", value=c.get('is_active', True), key=f"active_{c['id']}")
-                    ec_order = col3.number_input("순서", min_value=0, value=c.get('display_order') or 0, key=f"c_order_{c['id']}")
+                    ec_parking = col1.checkbox("🚗 주차 가능", value=c.get('parking_available', False), key=f"ctr_parking_{c['id']}")
+                    ec_active = col2.checkbox("✅ 활성화", value=c.get('is_active', True), key=f"ctr_active_{c['id']}")
+                    ec_order = col3.number_input("순서", min_value=0, value=c.get('display_order') or 0, key=f"ctr_order_{c['id']}")
                     
                     col1, col2 = st.columns(2)
                     save_btn = col1.form_submit_button("💾 저장", type="primary", use_container_width=True)
@@ -480,7 +454,7 @@ with tab3:
 # =============================================================
 with tab4:
     st.subheader("❓ FAQ 관리")
-    st.caption("자주 묻는 질문을 추가/수정하세요. 메인 페이지 하단과 챗봇 학습 자료로 사용됩니다.")
+    st.caption("자주 묻는 질문을 추가/수정하세요.")
     
     with st.expander("➕ 새 FAQ 추가"):
         with st.form("new_faq_form", clear_on_submit=True):
@@ -521,23 +495,23 @@ with tab4:
         st.info("등록된 FAQ가 없습니다.")
     else:
         for item in kb_items:
-    with st.expander(f"**[{item.get('category', '기타')}]** {item.get('question', '(질문 없음)')[:40]}..."):
-        with st.form(f"edit_faq_{item['id']}"):
-            ed_q = st.text_input("질문", value=item.get('question') or "")
-            ed_a = st.text_area("답변", value=item.get('answer') or "")
-            
-            col1, col2, col3 = st.columns(3)
-            ed_cat = col1.selectbox(
-                "카테고리",
-                ["회사소개", "담당자", "지원방법", "근무조건", "기타"],
-                index=["회사소개", "담당자", "지원방법", "근무조건", "기타"].index(item.get('category')) if item.get('category') in ["회사소개", "담당자", "지원방법", "근무조건", "기타"] else 4,
-                key=f"faq_cat_{item['id']}"
-            )
-            ed_order = col2.number_input("순서", min_value=0, value=item.get('display_order') or 0, key=f"faq_ord_{item['id']}")
-            
-            col1, col2 = st.columns(2)
-            ed_show = col1.checkbox("FAQ에 표시", value=item.get('show_in_faq', True), key=f"faq_show_{item['id']}")
-            ed_active = col2.checkbox("활성화", value=item.get('is_active', True), key=f"faq_act_{item['id']}")
+            with st.expander(f"**[{item.get('category', '기타')}]** {item.get('question', '(질문 없음)')[:40]}..."):
+                with st.form(f"edit_faq_{item['id']}"):
+                    ed_q = st.text_input("질문", value=item.get('question') or "", key=f"faq_q_{item['id']}")
+                    ed_a = st.text_area("답변", value=item.get('answer') or "", key=f"faq_a_{item['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    ed_cat = col1.selectbox(
+                        "카테고리",
+                        ["회사소개", "담당자", "지원방법", "근무조건", "기타"],
+                        index=["회사소개", "담당자", "지원방법", "근무조건", "기타"].index(item.get('category')) if item.get('category') in ["회사소개", "담당자", "지원방법", "근무조건", "기타"] else 4,
+                        key=f"faq_cat_{item['id']}"
+                    )
+                    ed_order = col2.number_input("순서", min_value=0, value=item.get('display_order') or 0, key=f"faq_ord_{item['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    ed_show = col1.checkbox("FAQ에 표시", value=item.get('show_in_faq', True), key=f"faq_show_{item['id']}")
+                    ed_active = col2.checkbox("활성화", value=item.get('is_active', True), key=f"faq_act_{item['id']}")
                     
                     col1, col2 = st.columns(2)
                     save = col1.form_submit_button("💾 저장", type="primary", use_container_width=True)
@@ -613,7 +587,6 @@ with tab5:
         new_auto_apply = st.checkbox(
             "대화 중 자동 지원 유도",
             value=settings.get('chatbot_auto_apply_prompt', 'true') == 'true',
-            help="대화 3번 이상 오가면 지원서 링크를 표시합니다."
         )
         
         submitted = st.form_submit_button("💾 모든 설정 저장", type="primary", use_container_width=True)
@@ -648,7 +621,7 @@ with tab5:
 with tab6:
     st.subheader("👥 지원자 명단")
     
-    st.info("💡 **추천**: 지원서는 **구글폼**으로 받는 것이 보안상 안전합니다. ⚙️ 사이트 설정 탭에서 구글폼 URL을 설정하세요.")
+    st.info("💡 **추천**: 지원서는 **구글폼**으로 받는 것이 보안상 안전합니다.")
     
     applicants = get_all_applicants()
     if applicants:
