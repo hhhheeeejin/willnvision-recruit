@@ -44,14 +44,13 @@ default_form_url = settings.get('default_google_form_url', '')
 openchat_url = settings.get('kakao_openchat_url', '')
 tone = settings.get('chatbot_tone', 'friendly')
 
-# 챗봇 커스텀 멘트
 bot_emoji = settings.get('chatbot_emoji', '🤖')
 bot_name = settings.get('chatbot_name', '윌비봇')
-bot_greeting = settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요 ●'◡'●")
+bot_greeting = settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요")
 bot_sub = settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!')
-bot_placeholder = settings.get('chatbot_placeholder', '편하게 질문 주세요... 🙌')
-bot_empty = settings.get('chatbot_empty_msg', '💬 대화를 시작해주세요!')
-bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요... 💭')
+bot_placeholder = settings.get('chatbot_placeholder', '편하게 질문 주세요...')
+bot_empty = settings.get('chatbot_empty_msg', '대화를 시작해주세요!')
+bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요...')
 
 # ============================================
 # OpenAI 클라이언트
@@ -59,12 +58,11 @@ bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에�
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # ============================================
-# CSS 스타일 - 밝은 블루 + 귀여운 느낌
+# CSS 스타일 (변수로 먼저 저장 - 렌더링 안전)
 # ============================================
-st.markdown("""
+CUSTOM_CSS = """
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" rel="stylesheet">
 <style>
-/* 전체 폰트 */
 html, body, [class*="css"] {
     font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
     letter-spacing: -0.4px;
@@ -76,7 +74,6 @@ html, body, [class*="css"] {
     max-width: 640px !important;
 }
 
-/* 🎯 히어로 영역 - 밝은 블루 */
 .hero-section {
     text-align: center;
     padding: 2.2rem 1.2rem 2rem;
@@ -111,7 +108,6 @@ html, body, [class*="css"] {
 .hero-emoji {
     font-size: 3rem;
     margin-bottom: 0.5rem;
-    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.15));
     position: relative;
     z-index: 1;
 }
@@ -149,7 +145,6 @@ html, body, [class*="css"] {
     z-index: 1;
 }
 
-/* 🎯 섹션 헤더 */
 .section-header {
     font-size: 1.15rem;
     font-weight: 800;
@@ -172,7 +167,6 @@ html, body, [class*="css"] {
     border-radius: 5px;
 }
 
-/* 💙 공고 카드 (expander) - 컴팩트하게 */
 [data-testid="stExpander"] {
     background: white !important;
     border: 2px solid #DBEAFE !important;
@@ -210,7 +204,6 @@ html, body, [class*="css"] {
     display: none !important;
 }
 
-/* ▼ 드롭다운 아이콘 */
 [data-testid="stExpander"] summary::after {
     content: "▼";
     font-size: 0.7rem;
@@ -232,7 +225,6 @@ html, body, [class*="css"] {
     flex: 1;
 }
 
-/* 🔘 버튼 */
 .stButton > button {
     border-radius: 14px !important;
     font-weight: 700 !important;
@@ -266,7 +258,6 @@ html, body, [class*="css"] {
     color: #1D4ED8 !important;
 }
 
-/* 🔗 링크 버튼 */
 .stLinkButton > a > button {
     border-radius: 14px !important;
     font-weight: 700 !important;
@@ -280,7 +271,6 @@ html, body, [class*="css"] {
     box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3) !important;
 }
 
-/* 📝 입력창 */
 .stTextInput > div > div > input,
 .stTextArea > div > div > textarea {
     border-radius: 14px !important;
@@ -295,7 +285,6 @@ html, body, [class*="css"] {
     box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.15) !important;
 }
 
-/* 💬 챗봇 인사말 박스 */
 .cute-greeting {
     background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
     border-radius: 22px;
@@ -308,7 +297,6 @@ html, body, [class*="css"] {
 .cute-greeting-emoji {
     font-size: 2.5rem;
     margin-bottom: 0.4rem;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
 }
 
 .cute-greeting-title {
@@ -325,14 +313,12 @@ html, body, [class*="css"] {
     font-weight: 600;
 }
 
-/* 💙 chat message */
 [data-testid="stChatMessage"] {
     background: #F8FAFC !important;
     border-radius: 16px !important;
     padding: 0.8rem !important;
 }
 
-/* 🎉 푸터 */
 .footer {
     text-align: center;
     padding: 1.5rem 0 1rem;
@@ -341,37 +327,19 @@ html, body, [class*="css"] {
     font-weight: 500;
 }
 
-/* 📦 caption 색상 */
 [data-testid="stCaptionContainer"] {
     color: #64748B !important;
 }
 
-/* 모바일 최적화 */
 @media (max-width: 640px) {
     .hero-emoji { font-size: 2.6rem; }
     .hero-title { font-size: 1.5rem; }
     .section-header { font-size: 1.05rem; }
 }
-
-/* 다크모드 대응 */
-@media (prefers-color-scheme: dark) {
-    [data-testid="stExpander"] {
-        background: #1E293B !important;
-        border-color: #334155 !important;
-    }
-    [data-testid="stExpander"] summary,
-    [data-testid="stExpander"] summary p {
-        color: #F1F5F9 !important;
-    }
-    .cute-greeting {
-        background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 100%);
-    }
-    .cute-greeting-title {
-        color: white !important;
-    }
-}
 </style>
-""", unsafe_allow_html=True)
+"""
+
+st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
 
 # ============================================
 # 히어로 영역
@@ -379,15 +347,15 @@ html, body, [class*="css"] {
 if hero_image:
     st.image(hero_image, use_container_width=True)
 
-st.markdown(
+HERO_HTML = (
     '<div class="hero-section">'
     f'<div class="hero-emoji">{hero_emoji}</div>'
     f'<div class="hero-title">{hero_title}</div>'
     f'<div class="hero-subtitle">{hero_subtitle}</div>'
     f'<div class="hero-phone">📞 {manager_name} · {manager_phone}</div>'
-    '</div>',
-    unsafe_allow_html=True
+    '</div>'
 )
+st.markdown(HERO_HTML, unsafe_allow_html=True)
 
 # ============================================
 # 모집 공고 (드롭다운)
@@ -531,17 +499,15 @@ if st.session_state.active_tab == "chat":
             f"6. 개인정보 수집 금지 - '개인정보는 지원서에서 받아요'"
         )
     
-    # 귀여운 인사말
-    st.markdown(
-        f'<div class="cute-greeting">'
+    GREETING_HTML = (
+        '<div class="cute-greeting">'
         f'<div class="cute-greeting-emoji">{bot_emoji}</div>'
         f'<div class="cute-greeting-title">{bot_greeting}</div>'
         f'<div class="cute-greeting-sub">{bot_sub}</div>'
-        f'</div>',
-        unsafe_allow_html=True
+        '</div>'
     )
+    st.markdown(GREETING_HTML, unsafe_allow_html=True)
     
-    # 추천 질문
     if not st.session_state.messages:
         st.markdown("<br>", unsafe_allow_html=True)
         st.caption("🔥 이런 걸 많이 물어봐요")
@@ -558,7 +524,6 @@ if st.session_state.active_tab == "chat":
                     st.session_state.preset_question = q
                     st.rerun()
     
-    # 대화 화면
     chat_container = st.container(border=True, height=350)
     with chat_container:
         if not st.session_state.messages:
@@ -568,7 +533,6 @@ if st.session_state.active_tab == "chat":
             with st.chat_message(msg["role"], avatar=avatar):
                 st.markdown(msg["content"])
     
-    # 메시지 입력
     preset = st.session_state.pop("preset_question", None)
     user_input = preset or st.chat_input(bot_placeholder)
     
@@ -604,7 +568,6 @@ if st.session_state.active_tab == "chat":
             st.error(f"오류 발생. {manager_phone}로 문의해주세요.")
             st.caption(f"에러: {str(e)[:100]}")
     
-    # 하단 액션
     if st.session_state.messages:
         col1, col2 = st.columns(2)
         with col1:
@@ -690,7 +653,7 @@ elif st.session_state.active_tab == "distance":
             naver_mode = naver_map.get(sel_transport, "transit")
             naver_url = f"https://map.naver.com/p/directions/-/{end_enc}/{naver_mode}"
             
-            result_html = (
+            RESULT_HTML = (
                 '<div style="background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); '
                 'padding: 1.2rem; border-radius: 16px; text-align: center; margin: 0.5rem 0; '
                 'border: 2px solid rgba(66, 133, 244, 0.15);">'
@@ -699,7 +662,7 @@ elif st.session_state.active_tab == "distance":
                 f'<div style="font-weight: 700; color: #1E3A8A; font-size: 1rem;">🏢 {selected_center["name"]}</div>'
                 '</div>'
             )
-            st.markdown(result_html, unsafe_allow_html=True)
+            st.markdown(RESULT_HTML, unsafe_allow_html=True)
             
             col1, col2 = st.columns(2)
             with col1:
@@ -722,7 +685,7 @@ elif st.session_state.active_tab == "contact":
     col1, col2 = st.columns(2)
     
     with col1:
-        kakao_card = (
+        KAKAO_CARD = (
             '<div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); '
             'padding: 1.3rem; border-radius: 16px; text-align: center; '
             'border: 2px solid rgba(251, 191, 36, 0.3);">'
@@ -731,14 +694,14 @@ elif st.session_state.active_tab == "contact":
             '<div style="font-size: 0.75rem; color: #B45309; font-weight: 500;">빠른 답변</div>'
             '</div>'
         )
-        st.markdown(kakao_card, unsafe_allow_html=True)
+        st.markdown(KAKAO_CARD, unsafe_allow_html=True)
         if openchat_url:
             st.link_button("오픈채팅 →", openchat_url, type="primary", use_container_width=True)
         else:
             st.button("준비중", disabled=True, use_container_width=True, key="kakao_disabled")
     
     with col2:
-        phone_card = (
+        PHONE_CARD = (
             '<div style="background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); '
             'padding: 1.3rem; border-radius: 16px; text-align: center; '
             'border: 2px solid rgba(66, 133, 244, 0.2);">'
@@ -747,7 +710,7 @@ elif st.session_state.active_tab == "contact":
             '<div style="font-size: 0.75rem; color: #2563EB; font-weight: 500;">즉시 상담</div>'
             '</div>'
         )
-        st.markdown(phone_card, unsafe_allow_html=True)
+        st.markdown(PHONE_CARD, unsafe_allow_html=True)
         phone_clean = manager_phone.replace('-', '')
         st.link_button(f"{manager_phone}", f"tel:{phone_clean}", use_container_width=True)
 
@@ -764,7 +727,7 @@ if faqs:
 # ============================================
 # 푸터
 # ============================================
-footer_html = (
+FOOTER_HTML = (
     '<div class="footer">'
     '💬 궁금한 점은 AI 상담사가 24시간 답변해드립니다<br>'
     f'📞 {manager_name} · {manager_phone}<br>'
@@ -772,4 +735,4 @@ footer_html = (
     '© 윌앤비전 채용팀'
     '</div>'
 )
-st.markdown(footer_html, unsafe_allow_html=True)
+st.markdown(FOOTER_HTML, unsafe_allow_html=True)
