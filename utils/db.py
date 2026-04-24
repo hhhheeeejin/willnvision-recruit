@@ -366,3 +366,54 @@ def calculate_distance_km(lat1, lng1, lat2, lng2):
     c = 2 * atan2(sqrt(a), sqrt(1-a))
     
     return R * c
+# ============ 센터 관리 ============
+
+def get_active_centers():
+    """활성 센터 목록"""
+    sb = get_supabase()
+    res = sb.table("centers").select("*").eq("is_active", True).order("display_order").execute()
+    return res.data
+
+
+def get_all_centers():
+    """전체 센터 (관리자용)"""
+    sb = get_supabase_admin()
+    res = sb.table("centers").select("*").order("display_order").execute()
+    return res.data
+
+
+def get_center(center_id):
+    """단일 센터 조회"""
+    sb = get_supabase()
+    res = sb.table("centers").select("*").eq("id", center_id).execute()
+    return res.data[0] if res.data else None
+
+
+def create_center(data):
+    sb = get_supabase_admin()
+    sb.table("centers").insert(data).execute()
+
+
+def update_center(center_id, data):
+    sb = get_supabase_admin()
+    sb.table("centers").update(data).eq("id", center_id).execute()
+
+
+def delete_center(center_id):
+    sb = get_supabase_admin()
+    sb.table("centers").delete().eq("id", center_id).execute()
+
+
+def get_jobs_by_center(center_id):
+    """특정 센터의 공고 조회"""
+    sb = get_supabase()
+    res = sb.table("jobs").select("*").eq("center_id", center_id).eq("status", "모집중").execute()
+    return res.data
+
+
+def get_active_jobs_with_center():
+    """공고 + 센터 정보 조인"""
+    sb = get_supabase()
+    res = sb.table("jobs").select("*, centers(id, name, address, subway_info)").eq("status", "모집중").order("display_order").execute()
+    return res.data
+
