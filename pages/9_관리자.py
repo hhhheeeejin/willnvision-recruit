@@ -69,16 +69,46 @@ with tab1:
     
     st.divider()
     
+    # 🏆 공고별 상세 통계 (문의 vs 지원 비교)
+    st.subheader("🏆 공고별 통계")
+    st.caption("각 공고가 얼마나 관심받았는지, 실제 지원까지 이어졌는지 확인")
+    
+    all_jobs_stats = get_all_jobs()
+    if all_jobs_stats:
+        import pandas as pd
+        
+        stats_data = []
+        for job in all_jobs_stats:
+            view_count = job.get('view_count') or 0
+            apply_count = job.get('apply_count') or 0
+            conversion = (apply_count / view_count * 100) if view_count > 0 else 0
+            stats_data.append({
+                "공고": job['title'][:30] + ('...' if len(job['title']) > 30 else ''),
+                "상태": job['status'],
+                "💬 문의 클릭": view_count,
+                "📝 지원 클릭": apply_count,
+                "🎯 전환율": f"{conversion:.1f}%"
+            })
+        
+        df_stats = pd.DataFrame(stats_data)
+        df_stats = df_stats.sort_values("💬 문의 클릭", ascending=False)
+        st.dataframe(df_stats, use_container_width=True, hide_index=True)
+        
+        st.caption("💡 전환율 = 지원 클릭 ÷ 문의 클릭 × 100 (높을수록 실제 지원까지 잘 이어진 공고)")
+    
+    st.divider()
+    
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("🔥 인기 공고 TOP 5")
+        st.subheader("🔥 인기 공고 TOP 5 (문의 기준)")
         popular = get_popular_jobs(5)
         if popular:
             for i, job in enumerate(popular, 1):
                 view_count = job.get('view_count', 0)
+                apply_count = job.get('apply_count', 0)
                 st.markdown(f"**{i}.** {job['title']}")
-                st.caption(f"👁️ 조회 {view_count}회 · 상태: {job['status']}")
+                st.caption(f"💬 문의 {view_count}회 · 📝 지원 {apply_count}회 · 상태: {job['status']}")
         else:
             st.info("아직 데이터가 없습니다.")
     
