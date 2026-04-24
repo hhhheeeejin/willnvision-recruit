@@ -2,7 +2,7 @@ import streamlit as st
 import uuid
 import urllib.parse
 from utils.db import (
-    get_active_jobs_with_center, get_setting, get_faq_items, 
+    get_active_jobs_with_center, get_faq_items, 
     increment_job_view, get_site_settings
 )
 
@@ -31,155 +31,127 @@ office_address = settings.get('office_address', '')
 # ============ 커스텀 CSS ============
 st.markdown("""
 <style>
-    /* 모바일 최적화 */
-    .block-container {
-        padding-top: 1.5rem !important;
-        padding-bottom: 3rem !important;
-        max-width: 640px !important;
-    }
-    
-    /* 헤더 영역 */
-    .hero-section {
-        text-align: center;
-        padding: 1.5rem 1rem 2rem;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 20px;
-        margin-bottom: 1.5rem;
-        color: white;
-    }
-    .hero-emoji {
-        font-size: 3rem;
-        margin-bottom: 0.5rem;
-    }
-    .hero-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin: 0.25rem 0;
-        color: white;
-    }
-    .hero-subtitle {
-        font-size: 0.95rem;
-        opacity: 0.95;
-        margin: 0.25rem 0;
-    }
-    .hero-phone {
-        font-size: 0.85rem;
-        opacity: 0.85;
-        margin-top: 0.5rem;
-    }
-    
-    /* 섹션 헤더 */
-    .section-header {
-        font-size: 1.15rem;
-        font-weight: 600;
-        margin: 1.5rem 0 0.75rem;
-        padding-left: 0.75rem;
-        border-left: 4px solid #764ba2;
-    }
-    
-    /* 공고 카드 */
+.block-container {
+    padding-top: 1.5rem !important;
+    padding-bottom: 3rem !important;
+    max-width: 640px !important;
+}
+
+.hero-section {
+    text-align: center;
+    padding: 1.5rem 1rem 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 20px;
+    margin-bottom: 1.5rem;
+    color: white;
+}
+.hero-emoji { font-size: 3rem; margin-bottom: 0.5rem; }
+.hero-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0.25rem 0;
+    color: white;
+}
+.hero-subtitle {
+    font-size: 0.95rem;
+    opacity: 0.95;
+    margin: 0.25rem 0;
+}
+.hero-phone {
+    font-size: 0.85rem;
+    opacity: 0.85;
+    margin-top: 0.5rem;
+}
+
+.section-header {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 1.5rem 0 0.75rem;
+    padding-left: 0.75rem;
+    border-left: 4px solid #764ba2;
+}
+
+.job-card {
+    background: white;
+    border: 1px solid #e8e8ef;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.job-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(118, 75, 162, 0.12);
+}
+.job-image {
+    width: 100%;
+    height: 160px;
+    object-fit: cover;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+}
+.job-image-placeholder {
+    width: 100%;
+    height: 120px;
+    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.5rem;
+}
+.job-content {
+    padding: 1rem 1.2rem 1.2rem;
+}
+.job-badge {
+    display: inline-block;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 10px;
+    margin-bottom: 0.5rem;
+}
+.job-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 0.25rem 0 0.75rem;
+    line-height: 1.4;
+}
+.job-meta {
+    font-size: 0.85rem;
+    color: #475569;
+    line-height: 1.8;
+}
+.job-meta-item {
+    display: block;
+    margin: 0.2rem 0;
+}
+
+.footer {
+    text-align: center;
+    padding: 1.5rem 0;
+    color: #94a3b8;
+    font-size: 0.8rem;
+}
+
+@media (prefers-color-scheme: dark) {
     .job-card {
-        background: white;
-        border: 1px solid #e8e8ef;
-        border-radius: 16px;
-        overflow: hidden;
-        margin-bottom: 1rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-        transition: transform 0.2s, box-shadow 0.2s;
+        background: #1e293b;
+        border-color: #334155;
     }
-    .job-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 16px rgba(118, 75, 162, 0.12);
-    }
-    .job-image {
-        width: 100%;
-        height: 160px;
-        object-fit: cover;
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-    }
-    .job-image-placeholder {
-        width: 100%;
-        height: 120px;
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 2.5rem;
-    }
-    .job-content {
-        padding: 1rem 1.2rem 1.2rem;
-    }
-    .job-badge {
-        display: inline-block;
-        background: #dcfce7;
-        color: #166534;
-        font-size: 0.7rem;
-        font-weight: 600;
-        padding: 0.2rem 0.6rem;
-        border-radius: 10px;
-        margin-bottom: 0.5rem;
-    }
-    .job-badge-closed {
-        background: #f1f5f9;
-        color: #64748b;
-    }
-    .job-title {
-        font-size: 1.05rem;
-        font-weight: 700;
-        color: #1e293b;
-        margin: 0.25rem 0 0.75rem;
-        line-height: 1.4;
-    }
-    .job-meta {
-        font-size: 0.85rem;
-        color: #475569;
-        line-height: 1.8;
-    }
-    .job-meta-item {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    
-    /* FAQ */
-    .faq-item {
-        background: #f8fafc;
-        border-radius: 12px;
-        padding: 0.9rem 1.1rem;
-        margin-bottom: 0.5rem;
-        border: 1px solid #e2e8f0;
-    }
-    
-    /* 푸터 */
-    .footer {
-        text-align: center;
-        padding: 1.5rem 0;
-        color: #94a3b8;
-        font-size: 0.8rem;
-    }
-    
-    /* 어두운 모드 대응 */
-    @media (prefers-color-scheme: dark) {
-        .job-card {
-            background: #1e293b;
-            border-color: #334155;
-        }
-        .job-title { color: #f1f5f9; }
-        .job-meta { color: #cbd5e1; }
-        .faq-item {
-            background: #1e293b;
-            border-color: #334155;
-        }
-    }
-    
-    /* 모바일에서 더 예쁘게 */
-    @media (max-width: 640px) {
-        .hero-section { padding: 1.2rem 0.8rem 1.5rem; }
-        .hero-emoji { font-size: 2.5rem; }
-        .hero-title { font-size: 1.3rem; }
-        .job-content { padding: 0.9rem 1rem 1rem; }
-        .job-title { font-size: 1rem; }
-    }
+    .job-title { color: #f1f5f9; }
+    .job-meta { color: #cbd5e1; }
+}
+
+@media (max-width: 640px) {
+    .hero-section { padding: 1.2rem 0.8rem 1.5rem; }
+    .hero-emoji { font-size: 2.5rem; }
+    .hero-title { font-size: 1.3rem; }
+    .job-content { padding: 0.9rem 1rem 1rem; }
+    .job-title { font-size: 1rem; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -205,45 +177,57 @@ if not jobs:
     st.info("현재 모집 중인 공고가 없습니다. 곧 새 공고가 오픈될 예정입니다.")
 else:
     for job in jobs:
-        # 카드 이미지 부분
+        # 1. 이미지 HTML 준비
         if job.get('image_url'):
             image_html = f'<img src="{job["image_url"]}" class="job-image" alt="{job["title"]}">'
         else:
             emoji = '📞' if job.get('category') == 'OB상담' else '📱'
             image_html = f'<div class="job-image-placeholder">{emoji}</div>'
         
-        # 센터 정보
+        # 2. 센터 정보 준비
         center_info = ""
         if job.get('centers'):
             center_info = f"🏢 {job['centers']['name']}"
         
-        # 지하철 정보
+        # 3. 지하철 정보 준비
         subway_info = ""
         if job.get('subway_station'):
             subway_info = f"🚇 {job.get('subway_line', '')} {job['subway_station']}"
         elif job.get('centers') and job['centers'].get('subway_info'):
             subway_info = f"🚇 {job['centers']['subway_info']}"
         
-        # 카드 HTML
-        st.markdown(f"""
-        <div class="job-card">
-            {image_html}
-            <div class="job-content">
-                <span class="job-badge">● {job['status']}</span>
-                <div class="job-title">{job['title']}</div>
-                <div class="job-meta">
-                    {f'<div class="job-meta-item">{center_info}</div>' if center_info else ''}
-                    <div class="job-meta-item">📍 {job.get('location', '')}</div>
-                    <div class="job-meta-item">💰 {job.get('salary', '')}</div>
-                    <div class="job-meta-item">⏰ {job.get('work_hours', '')} · {job.get('work_days', '')}</div>
-                    {f'<div class="job-meta-item">📅 교육 {job["education_period"]}</div>' if job.get('education_period') else ''}
-                    {f'<div class="job-meta-item">{subway_info}</div>' if subway_info else ''}
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
+        # 4. 메타 정보 리스트 준비
+        meta_items = []
+        if center_info:
+            meta_items.append(f'<div class="job-meta-item">{center_info}</div>')
+        if job.get('location'):
+            meta_items.append(f'<div class="job-meta-item">📍 {job.get("location")}</div>')
+        if job.get('salary'):
+            meta_items.append(f'<div class="job-meta-item">💰 {job.get("salary")}</div>')
+        if job.get('work_hours') or job.get('work_days'):
+            meta_items.append(f'<div class="job-meta-item">⏰ {job.get("work_hours", "")} · {job.get("work_days", "")}</div>')
+        if job.get('education_period'):
+            meta_items.append(f'<div class="job-meta-item">📅 교육 {job["education_period"]}</div>')
+        if subway_info:
+            meta_items.append(f'<div class="job-meta-item">{subway_info}</div>')
         
-        # 액션 버튼
+        meta_html = "".join(meta_items)
+        
+        # 5. 카드 HTML 조립 (한 줄로 만들어서 공백 문제 방지)
+        card_html = (
+            f'<div class="job-card">'
+            f'{image_html}'
+            f'<div class="job-content">'
+            f'<span class="job-badge">● {job["status"]}</span>'
+            f'<div class="job-title">{job["title"]}</div>'
+            f'<div class="job-meta">{meta_html}</div>'
+            f'</div>'
+            f'</div>'
+        )
+        
+        st.markdown(card_html, unsafe_allow_html=True)
+        
+        # 6. 액션 버튼
         col1, col2 = st.columns(2)
         with col1:
             if st.button("💬 문의하기", key=f"chat_{job['id']}", use_container_width=True):
@@ -285,8 +269,7 @@ with col2:
 faqs = get_faq_items()
 if faqs:
     st.markdown('<div class="section-header">💡 자주 묻는 질문</div>', unsafe_allow_html=True)
-    
-    for faq in faqs[:5]:  # 최대 5개만
+    for faq in faqs[:5]:
         with st.expander(f"❓ {faq.get('question', '')}"):
             st.write(faq.get('answer', ''))
 
