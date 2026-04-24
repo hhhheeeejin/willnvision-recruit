@@ -24,22 +24,22 @@ if interested_job_id:
         interested_job_title = job['title']
 
 # ============ 히어로 ============
-st.markdown("""
+st.markdown(f"""
 <style>
-.handoff-hero {
+.handoff-hero {{
     text-align: center;
     padding: 1rem 0 1.5rem;
-}
-.handoff-icon { font-size: 2.8rem; margin-bottom: 0.25rem; }
-.handoff-title { font-size: 1.4rem; font-weight: 700; margin: 0.25rem 0; }
-.handoff-sub { font-size: 0.9rem; color: #64748b; }
+}}
+.handoff-icon {{ font-size: 2.8rem; margin-bottom: 0.25rem; }}
+.handoff-title {{ font-size: 1.4rem; font-weight: 700; margin: 0.25rem 0; }}
+.handoff-sub {{ font-size: 0.9rem; color: #64748b; }}
 </style>
 <div class="handoff-hero">
     <div class="handoff-icon">🙋</div>
     <div class="handoff-title">담당자와 직접 대화하기</div>
     <div class="handoff-sub">{manager_name}님이 빠르게 답변드려요!</div>
 </div>
-""".replace("{manager_name}", manager_name), unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ============ 연락 방법 선택 ============
 st.markdown("### 📱 편한 방법으로 연락하세요")
@@ -60,7 +60,7 @@ with col1:
         st.button("준비중", disabled=True, use_container_width=True)
 
 with col2:
-    st.markdown(f"""
+    st.markdown("""
     <div style="background: #dbeafe; padding: 1rem; border-radius: 12px; text-align: center;">
         <div style="font-size: 2rem;">📞</div>
         <div style="font-weight: 600; margin-top: 0.3rem;">전화</div>
@@ -69,7 +69,7 @@ with col2:
     """, unsafe_allow_html=True)
     st.link_button(f"{manager_phone}", f"tel:{manager_phone.replace('-','')}", use_container_width=True)
 
-# ============ 메시지 템플릿 (AI가 파악한 맥락 활용) ============
+# ============ 메시지 템플릿 ============
 st.divider()
 st.markdown("### ✉️ 메시지 템플릿")
 st.caption("아래 템플릿을 복사해서 보내시면 빠른 답변을 받을 수 있어요!")
@@ -82,9 +82,9 @@ if interested_job_title:
 
 if experience_level:
     if experience_level == "신입":
-        template_parts.append(f"저는 이 분야 신입입니다.")
+        template_parts.append("저는 이 분야 신입입니다.")
     elif experience_level == "경력":
-        template_parts.append(f"저는 이 분야 경력자입니다.")
+        template_parts.append("저는 이 분야 경력자입니다.")
 
 if concerns:
     concern_text = ", ".join(concerns)
@@ -101,19 +101,23 @@ template_type = st.radio(
     horizontal=False,
 )
 
+# 공고 제목 prefix
+job_prefix = f"[{interested_job_title}] " if interested_job_title else ""
+
 templates = {
     "맞춤 템플릿 (AI 대화 기반)": default_template,
+    
     "지원 문의": f"""안녕하세요, {manager_name}님!
 윌앤비전 채용 공고 보고 연락드립니다.
 
-{'[' + interested_job_title + '] ' if interested_job_title else ''}공고에 관심이 있어서, 
+{job_prefix}공고에 관심이 있어서 
 지원 절차 및 자격 요건을 자세히 여쭤보고 싶습니다.
 
 답변 부탁드립니다. 감사합니다!""",
     
     "조건 상세 문의": f"""안녕하세요, {manager_name}님!
 
-{'[' + interested_job_title + '] ' if interested_job_title else ''}공고 관련해서 
+{job_prefix}공고 관련해서 
 몇 가지 자세한 조건을 여쭤보고 싶어요.
 
 - 급여 (기본급 외 추가 수당)
@@ -124,7 +128,7 @@ templates = {
     
     "면접 일정 문의": f"""안녕하세요, {manager_name}님!
 
-{'[' + interested_job_title + '] ' if interested_job_title else ''}공고 지원을 검토 중인데,
+{job_prefix}공고 지원을 검토 중인데,
 면접 일정이 어떻게 되는지 여쭤보고 싶습니다.
 
 제 가능 시간과 맞춰서 조율 가능할까요?
@@ -140,27 +144,16 @@ templates = {
 
 selected_template = templates[template_type]
 
-# 템플릿 표시 + 복사
+# 템플릿 표시
 st.text_area(
     "📋 복사해서 쓰실 메시지",
     value=selected_template,
     height=200,
     help="텍스트 박스 내용을 복사(Ctrl+C)해서 카톡이나 문자로 보내주세요.",
+    key="template_display"
 )
 
-# 복사 버튼 (JavaScript)
-st.markdown(f"""
-<div style="text-align: center; margin: 0.5rem 0;">
-    <button onclick="navigator.clipboard.writeText(`{selected_template.replace('`', "\\`")}`); 
-                     this.innerText='✅ 복사됨!'; 
-                     setTimeout(() => this.innerText='📋 메시지 복사하기', 2000);"
-            style="background: #6366f1; color: white; border: none; 
-                   padding: 0.5rem 1.5rem; border-radius: 8px; cursor: pointer;
-                   font-size: 0.9rem; font-weight: 500;">
-        📋 메시지 복사하기
-    </button>
-</div>
-""", unsafe_allow_html=True)
+st.caption("💡 위 텍스트를 전체 선택(Ctrl+A) 후 복사(Ctrl+C)해서 카톡이나 문자로 보내주세요!")
 
 # ============ 빠른 질문 버튼 ============
 st.divider()
