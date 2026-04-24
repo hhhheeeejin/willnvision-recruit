@@ -524,7 +524,7 @@ if st.session_state.active_tab == "chat":
                     st.session_state.preset_question = q
                     st.rerun()
     
-    chat_container = st.container(border=True, height=350)
+    chat_container = st.container(border=True, height=250)
     with chat_container:
         if not st.session_state.messages:
             st.caption(bot_empty)
