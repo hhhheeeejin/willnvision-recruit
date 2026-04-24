@@ -44,6 +44,15 @@ default_form_url = settings.get('default_google_form_url', '')
 openchat_url = settings.get('kakao_openchat_url', '')
 tone = settings.get('chatbot_tone', 'friendly')
 
+# 챗봇 커스텀 멘트
+bot_emoji = settings.get('chatbot_emoji', '🤖')
+bot_name = settings.get('chatbot_name', '윌비봇')
+bot_greeting = settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요 ●'◡'●")
+bot_sub = settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!')
+bot_placeholder = settings.get('chatbot_placeholder', '편하게 질문 주세요... 🙌')
+bot_empty = settings.get('chatbot_empty_msg', '💬 대화를 시작해주세요!')
+bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요... 💭')
+
 # ============================================
 # OpenAI 클라이언트
 # ============================================
@@ -78,48 +87,11 @@ st.markdown("""
     padding-left: 0.6rem;
     border-left: 4px solid #764ba2;
 }
-.job-card {
-    background: white;
-    border: 1px solid #e8e8ef;
-    border-radius: 14px;
-    overflow: hidden;
-    margin-bottom: 0.8rem;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
-}
-.job-image { width: 100%; height: 130px; object-fit: cover; }
-.job-image-placeholder {
-    width: 100%;
-    height: 100px;
-    background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.2rem;
-}
-.job-content { padding: 0.8rem 1rem 0.9rem; }
-.job-badge {
-    display: inline-block;
-    background: #dcfce7;
-    color: #166534;
-    font-size: 0.68rem;
-    font-weight: 600;
-    padding: 0.15rem 0.55rem;
-    border-radius: 8px;
-    margin-bottom: 0.4rem;
-}
-.job-title { font-size: 1rem; font-weight: 700; color: #1e293b; margin: 0.2rem 0 0.5rem; line-height: 1.35; }
-.job-meta { font-size: 0.82rem; color: #475569; line-height: 1.7; }
-.job-meta-item { display: block; margin: 0.15rem 0; }
 .footer {
     text-align: center;
     padding: 1.2rem 0;
     color: #94a3b8;
     font-size: 0.75rem;
-}
-@media (prefers-color-scheme: dark) {
-    .job-card { background: #1e293b; border-color: #334155; }
-    .job-title { color: #f1f5f9; }
-    .job-meta { color: #cbd5e1; }
 }
 @media (max-width: 640px) {
     .hero-emoji { font-size: 2.3rem; }
@@ -145,7 +117,7 @@ st.markdown(
 )
 
 # ============================================
-# 모집 공고 목록 (드롭다운)
+# 모집 공고 (드롭다운)
 # ============================================
 st.markdown('<div class="section-header">📌 모집 중인 공고</div>', unsafe_allow_html=True)
 
@@ -155,17 +127,12 @@ if not jobs:
     st.info("현재 모집 중인 공고가 없습니다.")
 else:
     for job in jobs:
-        # 상태 배지
         status_emoji = "🟢" if job['status'] == '모집중' else ("🟡" if job['status'] == '재오픈예정' else "⚫")
         
-        # 드롭다운 (expander)
         with st.expander(f"{status_emoji} **{job['title']}**", expanded=False):
-            
-            # 이미지 표시
             if job.get('image_url'):
                 st.image(job['image_url'], use_container_width=True)
             
-            # 상세 정보
             detail_lines = []
             if job.get('centers'):
                 detail_lines.append(f"🏢 **{job['centers']['name']}**")
@@ -187,14 +154,12 @@ else:
             for line in detail_lines:
                 st.markdown(line)
             
-            # 설명 (있으면)
             if job.get('description'):
                 st.markdown("---")
                 st.caption(job['description'])
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # 액션 버튼
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("💬 이 공고 문의", key=f"chat_{job['id']}", use_container_width=True):
@@ -206,12 +171,10 @@ else:
             with col2:
                 apply_url = job.get('google_form_url') or default_form_url
                 if apply_url:
-                    # 지원 버튼 클릭 시 카운트 증가 후 링크 열기
                     if st.button("📝 지원하기", key=f"apply_{job['id']}", use_container_width=True, type="primary"):
                         increment_job_apply(job['id'], st.session_state.session_id)
-                        # JavaScript로 새 탭에서 열기
                         st.markdown(f'<meta http-equiv="refresh" content="0; url={apply_url}">', unsafe_allow_html=True)
-                        st.success(f"지원 페이지로 이동 중...")
+                        st.success("지원 페이지로 이동 중...")
                         st.markdown(f"자동 이동 안 되면 [여기 클릭]({apply_url})")
                 else:
                     st.button("📝 지원 준비중", key=f"apply_{job['id']}", use_container_width=True, disabled=True)
@@ -230,7 +193,6 @@ with tab_cols[0]:
         st.rerun()
 
 with tab_cols[1]:
-    # 간편 지원 - 구글폼으로 바로 이동 (외부 링크)
     if default_form_url:
         st.link_button("📝 간편지원", default_form_url, use_container_width=True, type="secondary")
     else:
@@ -249,6 +211,7 @@ with tab_cols[3]:
         st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
+
 # ============================================
 # 탭 1: AI 상담사
 # ============================================
@@ -281,7 +244,7 @@ if st.session_state.active_tab == "chat":
         }.get(tone, '친근한 말투')
         
         return (
-            f"당신은 윌앤비전 채용팀 AI 상담사 '윌비'입니다.\n"
+            f"당신은 윌앤비전 채용팀 AI 상담사 '{bot_name}'입니다.\n"
             f"{tone_guide}\n\n"
             f"[모집 공고]\n{job_info}\n\n"
             f"[FAQ]\n{kb_info}\n\n"
@@ -295,54 +258,46 @@ if st.session_state.active_tab == "chat":
             f"6. 개인정보 수집 금지 - '개인정보는 지원서에서 받아요'"
         )
     
-    # 챗봇 설정 가져오기
-bot_emoji = settings.get('chatbot_emoji', '🤖')
-bot_name = settings.get('chatbot_name', '윌비봇')
-bot_greeting = settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요 ●'◡'●")
-bot_sub = settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!')
-bot_placeholder = settings.get('chatbot_placeholder', '편하게 질문 주세요... 🙌')
-bot_empty = settings.get('chatbot_empty_msg', '💬 대화를 시작해주세요!')
-bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요... 💭')
-
-# 귀여운 인사말 (크게)
-st.markdown(f"""
-<div style="text-align: center; padding: 0.8rem 0 0.5rem;">
-    <div style="font-size: 2rem; margin-bottom: 0.3rem;">{bot_emoji}</div>
-    <div style="font-size: 1.05rem; font-weight: 600; color: #4c1d95;">{bot_greeting}</div>
-    <div style="font-size: 0.85rem; color: #64748b; margin-top: 0.2rem;">{bot_sub}</div>
-</div>
-""", unsafe_allow_html=True)
-
-# 추천 질문
-if not st.session_state.messages:
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.caption("🔥 이런 걸 많이 물어봐요")
-    sug_col1, sug_col2 = st.columns(2)
-    suggested_questions = [
-        settings.get('suggested_q_1', '신입도 가능해요?'),
-        settings.get('suggested_q_2', '재택 있나요?'),
-        settings.get('suggested_q_3', '급여 얼마에요?'),
-        settings.get('suggested_q_4', '교육 기간은?'),
-    ]
-    for idx, q in enumerate(suggested_questions):
-        with sug_col1 if idx % 2 == 0 else sug_col2:
-            if st.button(q, key=f"sug_{idx}", use_container_width=True):
-                st.session_state.preset_question = q
-                st.rerun()
-
-# 대화 화면
-chat_container = st.container(border=True, height=350)
-with chat_container:
+    # 귀여운 인사말
+    st.markdown(
+        f'<div style="text-align: center; padding: 0.8rem 0 0.5rem;">'
+        f'<div style="font-size: 2rem; margin-bottom: 0.3rem;">{bot_emoji}</div>'
+        f'<div style="font-size: 1.05rem; font-weight: 600; color: #4c1d95;">{bot_greeting}</div>'
+        f'<div style="font-size: 0.85rem; color: #64748b; margin-top: 0.2rem;">{bot_sub}</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
+    
+    # 추천 질문
     if not st.session_state.messages:
-        st.caption(bot_empty)
-    for msg in st.session_state.messages:
-        avatar = bot_emoji if msg["role"] == "assistant" else None
-        with st.chat_message(msg["role"], avatar=avatar):
-            st.markdown(msg["content"])
-
-# 메시지 입력
-preset = st.session_state.pop("preset_question", None)
-user_input = preset or st.chat_input(bot_placeholder)
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.caption("🔥 이런 걸 많이 물어봐요")
+        sug_col1, sug_col2 = st.columns(2)
+        suggested_questions = [
+            settings.get('suggested_q_1', '신입도 가능해요?'),
+            settings.get('suggested_q_2', '재택 있나요?'),
+            settings.get('suggested_q_3', '급여 얼마에요?'),
+            settings.get('suggested_q_4', '교육 기간은?'),
+        ]
+        for idx, q in enumerate(suggested_questions):
+            with sug_col1 if idx % 2 == 0 else sug_col2:
+                if st.button(q, key=f"sug_{idx}", use_container_width=True):
+                    st.session_state.preset_question = q
+                    st.rerun()
+    
+    # 대화 화면
+    chat_container = st.container(border=True, height=350)
+    with chat_container:
+        if not st.session_state.messages:
+            st.caption(bot_empty)
+        for msg in st.session_state.messages:
+            avatar = bot_emoji if msg["role"] == "assistant" else None
+            with st.chat_message(msg["role"], avatar=avatar):
+                st.markdown(msg["content"])
+    
+    # 메시지 입력
+    preset = st.session_state.pop("preset_question", None)
+    user_input = preset or st.chat_input(bot_placeholder)
     
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
@@ -353,7 +308,7 @@ user_input = preset or st.chat_input(bot_placeholder)
             chat_history.extend(st.session_state.messages[-8:])
             
             with st.spinner(bot_thinking):
-    response = client.chat.completions.create(
+                response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=chat_history,
                     temperature=0.7,
@@ -402,7 +357,6 @@ elif st.session_state.active_tab == "distance":
         key="start_addr"
     )
     
-    # 빠른 선택
     quick_cols = st.columns(4)
     quick_stations = ["강남역", "홍대입구역", "서울역", "잠실역"]
     for idx, loc in enumerate(quick_stations):
@@ -413,7 +367,6 @@ elif st.session_state.active_tab == "distance":
     
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # 센터 선택
     centers = get_active_centers()
     if not centers:
         st.warning("등록된 센터가 없어요. 관리자 페이지에서 추가해주세요.")
@@ -432,7 +385,6 @@ elif st.session_state.active_tab == "distance":
             )
             selected_center = next(c for c in centers if c['id'] == sel_id)
         
-        # 교통수단 선택
         st.markdown("**🚏 교통수단**")
         t_cols = st.columns(4)
         transport_labels = [
@@ -450,7 +402,6 @@ elif st.session_state.active_tab == "distance":
                     st.session_state['sel_transport'] = key
                     st.rerun()
         
-        # 경로 확인
         if start_address:
             st.markdown("<br>", unsafe_allow_html=True)
             start_enc = urllib.parse.quote(start_address)
