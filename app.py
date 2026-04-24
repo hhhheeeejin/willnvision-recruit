@@ -217,29 +217,38 @@ else:
                     st.button("📝 지원 준비중", key=f"apply_{job['id']}", use_container_width=True, disabled=True)
 
 # ============================================
-# 기능 탭 선택
+# 기능 탭 선택 (4개)
 # ============================================
 st.markdown('<div class="section-header">⚡ 기능 선택</div>', unsafe_allow_html=True)
 
-tab_cols = st.columns(3)
+tab_cols = st.columns(4)
+
 with tab_cols[0]:
     if st.button("💬 AI 상담", key="tab_chat", use_container_width=True,
                  type="primary" if st.session_state.active_tab == "chat" else "secondary"):
         st.session_state.active_tab = "chat"
         st.rerun()
+
 with tab_cols[1]:
+    # 간편 지원 - 구글폼으로 바로 이동 (외부 링크)
+    if default_form_url:
+        st.link_button("📝 간편지원", default_form_url, use_container_width=True, type="secondary")
+    else:
+        st.button("📝 간편지원", key="btn_apply_disabled", use_container_width=True, disabled=True)
+
+with tab_cols[2]:
     if st.button("🚇 출근거리", key="tab_distance", use_container_width=True,
                  type="primary" if st.session_state.active_tab == "distance" else "secondary"):
         st.session_state.active_tab = "distance"
         st.rerun()
-with tab_cols[2]:
-    if st.button("🙋 담당자", key="tab_contact", use_container_width=True,
+
+with tab_cols[3]:
+    if st.button("🙋 지원문의", key="tab_contact", use_container_width=True,
                  type="primary" if st.session_state.active_tab == "contact" else "secondary"):
         st.session_state.active_tab = "contact"
         st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
-
 # ============================================
 # 탭 1: AI 상담사
 # ============================================
