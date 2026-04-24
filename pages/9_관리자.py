@@ -1,14 +1,13 @@
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime
 from io import BytesIO
 from utils.db import (
-    get_all_jobs, get_job, create_job, update_job, delete_job,
-    get_all_conversations, get_all_applicants,
-    update_job_status, update_applicant_status,
+    get_all_jobs, create_job, update_job, delete_job,
+    get_all_conversations,
     get_all_knowledge, create_knowledge, update_knowledge, delete_knowledge,
     get_site_settings, update_setting,
-    upload_image, delete_image,
+    upload_image,
     get_stats, get_popular_jobs,
     get_all_centers, create_center, update_center, delete_center, get_active_centers,
 )
@@ -40,13 +39,13 @@ check_password()
 st.title("🔐 윌앤비전 채용 관리자")
 st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+# 탭 6개 (지원자 명단 제외)
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 대시보드",
     "📋 공고 관리",
     "🏢 센터 관리",
     "❓ FAQ 관리",
     "⚙️ 사이트 설정",
-    "👥 지원자 명단",
     "💬 대화 기록"
 ])
 
@@ -58,11 +57,10 @@ with tab1:
     
     stats = get_stats()
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
     col1.metric("🟢 모집중 공고", stats['jobs_active'], f"전체 {stats['jobs_total']}개")
     col2.metric("💬 누적 대화", f"{stats['total_conversations']:,}")
     col3.metric("👥 순 방문자", f"{stats['unique_visitors']:,}")
-    col4.metric("📝 지원자", f"{stats['applicants_total']:,}")
     
     st.divider()
     
@@ -95,14 +93,14 @@ with tab1:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.subheader("🔥 인기 공고 TOP 5 (문의 기준)")
+        st.subheader("🔥 인기 공고 TOP 5")
         popular = get_popular_jobs(5)
         if popular:
             for i, job in enumerate(popular, 1):
                 view_count = job.get('view_count', 0)
                 apply_count = job.get('apply_count', 0)
                 st.markdown(f"**{i}.** {job['title']}")
-                st.caption(f"💬 문의 {view_count}회 · 📝 지원 {apply_count}회 · 상태: {job['status']}")
+                st.caption(f"💬 문의 {view_count}회 · 📝 지원 {apply_count}회 · {job['status']}")
         else:
             st.info("아직 데이터가 없습니다.")
     
@@ -577,93 +575,89 @@ with tab5:
         new_address = st.text_input("기본 사무실 주소", value=settings.get('office_address', ''))
         
         st.divider()
-st.markdown("### 🤖 챗봇 설정")
-st.caption("챗봇 이름, 인사말, 추천 질문 등을 꾸밀 수 있어요!")
-
-col1, col2 = st.columns([1, 3])
-new_bot_emoji = col1.text_input("챗봇 이모지", value=settings.get('chatbot_emoji', '🤖'))
-new_bot_name = col2.text_input("챗봇 이름", value=settings.get('chatbot_name', '윌비봇'))
-
-new_greeting = st.text_input(
-    "메인 인사말",
-    value=settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요 ●'◡'●"),
-    help="챗봇 상단에 큰 글씨로 표시되는 문구"
-)
-new_sub_greeting = st.text_input(
-    "서브 인사말",
-    value=settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!'),
-    help="인사말 아래 작은 글씨"
-)
-
-col1, col2 = st.columns(2)
-new_placeholder = col1.text_input(
-    "입력창 안내",
-    value=settings.get('chatbot_placeholder', '편하게 질문 주세요... 🙌'),
-    help="질문 입력란에 나타나는 안내 문구"
-)
-new_empty_msg = col2.text_input(
-    "빈 대화 문구",
-    value=settings.get('chatbot_empty_msg', '💬 대화를 시작해주세요!'),
-    help="대화가 없을 때 보여줄 문구"
-)
-
-new_thinking_msg = st.text_input(
-    "답변 대기 문구",
-    value=settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요... 💭'),
-    help="AI가 답변 만드는 동안 보여줄 문구"
-)
-
-st.markdown("**💡 추천 질문 (챗봇 시작 시 표시)**")
-col1, col2 = st.columns(2)
-new_sug_q1 = col1.text_input("추천 질문 1", value=settings.get('suggested_q_1', '신입도 가능해요?'))
-new_sug_q2 = col2.text_input("추천 질문 2", value=settings.get('suggested_q_2', '재택 있나요?'))
-col1, col2 = st.columns(2)
-new_sug_q3 = col1.text_input("추천 질문 3", value=settings.get('suggested_q_3', '급여 얼마에요?'))
-new_sug_q4 = col2.text_input("추천 질문 4", value=settings.get('suggested_q_4', '교육 기간은?'))
-
-st.markdown("**🎭 말투 & 동작**")
-new_tone = st.selectbox(
-    "말투 스타일",
-    ["friendly", "casual", "formal"],
-    format_func=lambda x: {"friendly": "😊 친근하게", "casual": "🙌 편하게", "formal": "🎩 격식있게"}[x],
-    index=["friendly", "casual", "formal"].index(settings.get('chatbot_tone', 'friendly'))
-)
-new_auto_apply = st.checkbox(
-    "대화 중 자동 지원 유도",
-    value=settings.get('chatbot_auto_apply_prompt', 'true') == 'true',
-    help="대화가 충분히 오가면 지원서 링크를 표시"
-)
+        st.markdown("### 🤖 챗봇 설정")
+        st.caption("챗봇 이름, 인사말, 추천 질문 등을 꾸밀 수 있어요!")
+        
+        col1, col2 = st.columns([1, 3])
+        new_bot_emoji = col1.text_input("챗봇 이모지", value=settings.get('chatbot_emoji', '🤖'))
+        new_bot_name = col2.text_input("챗봇 이름", value=settings.get('chatbot_name', '윌비봇'))
+        
+        new_greeting = st.text_input(
+            "메인 인사말",
+            value=settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요 ●'◡'●"),
+            help="챗봇 상단에 큰 글씨로 표시되는 문구"
+        )
+        new_sub_greeting = st.text_input(
+            "서브 인사말",
+            value=settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!'),
+            help="인사말 아래 작은 글씨"
+        )
+        
+        col1, col2 = st.columns(2)
+        new_placeholder = col1.text_input(
+            "입력창 안내",
+            value=settings.get('chatbot_placeholder', '편하게 질문 주세요... 🙌'),
+        )
+        new_empty_msg = col2.text_input(
+            "빈 대화 문구",
+            value=settings.get('chatbot_empty_msg', '💬 대화를 시작해주세요!'),
+        )
+        
+        new_thinking_msg = st.text_input(
+            "답변 대기 문구",
+            value=settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요... 💭'),
+        )
+        
+        st.markdown("**💡 추천 질문 (챗봇 시작 시 표시)**")
+        col1, col2 = st.columns(2)
+        new_sug_q1 = col1.text_input("추천 질문 1", value=settings.get('suggested_q_1', '신입도 가능해요?'))
+        new_sug_q2 = col2.text_input("추천 질문 2", value=settings.get('suggested_q_2', '재택 있나요?'))
+        col1, col2 = st.columns(2)
+        new_sug_q3 = col1.text_input("추천 질문 3", value=settings.get('suggested_q_3', '급여 얼마에요?'))
+        new_sug_q4 = col2.text_input("추천 질문 4", value=settings.get('suggested_q_4', '교육 기간은?'))
+        
+        st.markdown("**🎭 말투 & 동작**")
+        new_tone = st.selectbox(
+            "말투 스타일",
+            ["friendly", "casual", "formal"],
+            format_func=lambda x: {"friendly": "😊 친근하게", "casual": "🙌 편하게", "formal": "🎩 격식있게"}[x],
+            index=["friendly", "casual", "formal"].index(settings.get('chatbot_tone', 'friendly'))
+        )
+        new_auto_apply = st.checkbox(
+            "대화 중 자동 지원 유도",
+            value=settings.get('chatbot_auto_apply_prompt', 'true') == 'true',
+            help="대화가 충분히 오가면 지원서 링크를 표시"
+        )
         
         submitted = st.form_submit_button("💾 모든 설정 저장", type="primary", use_container_width=True)
         
         if submitted:
-    updates = {
-        'hero_emoji': new_emoji,
-        'hero_title': new_title,
-        'hero_subtitle': new_subtitle,
-        'hero_image_url': new_hero_img,
-        'company_intro': new_intro,
-        'manager_name': new_m_name,
-        'manager_phone': new_m_phone,
-        'manager_email': new_m_email,
-        'default_google_form_url': new_default_form,
-        'kakao_openchat_url': new_openchat,
-        'office_address': new_address,
-        # 챗봇 설정
-        'chatbot_name': new_bot_name,
-        'chatbot_emoji': new_bot_emoji,
-        'chatbot_greeting': new_greeting,
-        'chatbot_sub_greeting': new_sub_greeting,
-        'chatbot_placeholder': new_placeholder,
-        'chatbot_empty_msg': new_empty_msg,
-        'chatbot_thinking_msg': new_thinking_msg,
-        'suggested_q_1': new_sug_q1,
-        'suggested_q_2': new_sug_q2,
-        'suggested_q_3': new_sug_q3,
-        'suggested_q_4': new_sug_q4,
-        'chatbot_tone': new_tone,
-        'chatbot_auto_apply_prompt': 'true' if new_auto_apply else 'false',
-    }
+            updates = {
+                'hero_emoji': new_emoji,
+                'hero_title': new_title,
+                'hero_subtitle': new_subtitle,
+                'hero_image_url': new_hero_img,
+                'company_intro': new_intro,
+                'manager_name': new_m_name,
+                'manager_phone': new_m_phone,
+                'manager_email': new_m_email,
+                'default_google_form_url': new_default_form,
+                'kakao_openchat_url': new_openchat,
+                'office_address': new_address,
+                'chatbot_name': new_bot_name,
+                'chatbot_emoji': new_bot_emoji,
+                'chatbot_greeting': new_greeting,
+                'chatbot_sub_greeting': new_sub_greeting,
+                'chatbot_placeholder': new_placeholder,
+                'chatbot_empty_msg': new_empty_msg,
+                'chatbot_thinking_msg': new_thinking_msg,
+                'suggested_q_1': new_sug_q1,
+                'suggested_q_2': new_sug_q2,
+                'suggested_q_3': new_sug_q3,
+                'suggested_q_4': new_sug_q4,
+                'chatbot_tone': new_tone,
+                'chatbot_auto_apply_prompt': 'true' if new_auto_apply else 'false',
+            }
             try:
                 for k, v in updates.items():
                     update_setting(k, v)
@@ -673,46 +667,9 @@ new_auto_apply = st.checkbox(
                 st.error(f"저장 실패: {e}")
 
 # =============================================================
-# TAB 6: 지원자 명단
+# TAB 6: 대화 기록
 # =============================================================
 with tab6:
-    st.subheader("👥 지원자 명단")
-    
-    st.info("💡 **추천**: 지원서는 **구글폼**으로 받는 것이 보안상 안전합니다.")
-    
-    applicants = get_all_applicants()
-    if applicants:
-        df = pd.DataFrame([{
-            "지원일": a['created_at'][:10],
-            "이름": a['name'],
-            "연락처": a['phone'],
-            "지원공고": a['job_title_snapshot'],
-            "경력": a['experience'],
-            "상태": a['status'],
-            "자기소개": a['introduction'] or "",
-            "메모": a['memo'] or "",
-        } for a in applicants])
-        
-        st.dataframe(df, use_container_width=True, hide_index=True)
-        
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False, sheet_name='지원자명단')
-        
-        st.download_button(
-            "📥 엑셀 다운로드",
-            data=output.getvalue(),
-            file_name=f"applicants_{datetime.now().strftime('%Y%m%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            type="primary",
-        )
-    else:
-        st.info("아직 Streamlit 내부 지원자가 없습니다. 구글폼 지원자는 구글시트에서 확인하세요.")
-
-# =============================================================
-# TAB 7: 대화 기록
-# =============================================================
-with tab7:
     st.subheader("💬 AI 챗봇 대화 기록")
     conversations = get_all_conversations()
     
