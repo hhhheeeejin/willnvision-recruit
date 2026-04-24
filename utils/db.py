@@ -433,3 +433,35 @@ def increment_job_apply(job_id, session_id=None):
             sb.table("jobs").update({"apply_count": new_count}).eq("id", job_id).execute()
     except Exception:
         pass
+# ============ 센터별 FAQ ============
+
+def get_center_faqs(center_id):
+    """특정 센터의 FAQ 조회"""
+    sb = get_supabase()
+    res = sb.table("center_faqs").select("*").eq("center_id", center_id).eq("is_active", True).order("display_order").execute()
+    return res.data
+
+
+def get_all_center_faqs(center_id):
+    """관리자용 - 전체 조회 (비활성 포함)"""
+    sb = get_supabase_admin()
+    res = sb.table("center_faqs").select("*").eq("center_id", center_id).order("display_order").execute()
+    return res.data
+
+
+def create_center_faq(data):
+    """센터 FAQ 생성"""
+    sb = get_supabase_admin()
+    sb.table("center_faqs").insert(data).execute()
+
+
+def update_center_faq(faq_id, data):
+    """센터 FAQ 수정"""
+    sb = get_supabase_admin()
+    sb.table("center_faqs").update(data).eq("id", faq_id).execute()
+
+
+def delete_center_faq(faq_id):
+    """센터 FAQ 삭제"""
+    sb = get_supabase_admin()
+    sb.table("center_faqs").delete().eq("id", faq_id).execute()
