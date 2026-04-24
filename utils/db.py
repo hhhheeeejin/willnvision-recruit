@@ -416,4 +416,20 @@ def get_active_jobs_with_center():
     sb = get_supabase()
     res = sb.table("jobs").select("*, centers(id, name, address, subway_info)").eq("status", "모집중").order("display_order").execute()
     return res.data
+# ============ 지원 클릭 추적 ============
 
+def increment_job_apply(job_id, session_id=None):
+    """지원하기 버튼 클릭 기록"""
+    try:
+        sb = get_supabase()
+        if session_id:
+            sb.table("job_apply_clicks").insert({
+                "job_id": job_id,
+                "session_id": session_id
+            }).execute()
+        job = get_job(job_id)
+        if job:
+            new_count = (job.get('apply_count') or 0) + 1
+            sb.table("jobs").update({"apply_count": new_count}).eq("id", job_id).execute()
+    except Exception:
+        pass
