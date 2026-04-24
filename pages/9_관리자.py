@@ -43,9 +43,10 @@ st.title("🔐 윌앤비전 채용 관리자")
 st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
 # ============ 탭 구성 ============
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📊 대시보드",
-    "📋 공고 관리", 
+    "📋 공고 관리",
+    "🏢 센터 관리",
     "❓ FAQ 관리",
     "⚙️ 사이트 설정",
     "👥 지원자 명단",
