@@ -339,7 +339,7 @@ html, body, [class*="css"] {
 </style>
 """
 
-st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+st.html(CUSTOM_CSS)
 
 # ============================================
 # 히어로 영역
