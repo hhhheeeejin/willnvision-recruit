@@ -42,7 +42,7 @@ check_password()
 st.title("🔐 윌앤비전 채용 관리자")
 st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-# ============ 탭 구성 ============
+# ============ 탭 구성 (7개) ============
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "📊 대시보드",
     "📋 공고 관리",
@@ -89,11 +89,9 @@ with tab1:
     
     st.divider()
     
-    # 최근 대화 분석
     st.subheader("📈 최근 활동")
     conversations = get_all_conversations()
     if conversations:
-        # 최근 7일간 대화 분석
         now = datetime.now()
         recent = [c for c in conversations if datetime.fromisoformat(c['created_at'].replace('Z', '+00:00')).replace(tzinfo=None) > now - timedelta(days=7)]
         
@@ -103,17 +101,30 @@ with tab1:
                    f"{(stats['applicants_total']/stats['unique_visitors']*100):.1f}%" if stats['unique_visitors'] > 0 else "0%")
 
 # =============================================================
-# TAB 2: 공고 관리 (CRUD)
+# TAB 2: 공고 관리
 # =============================================================
 with tab2:
     st.subheader("📋 공고 관리")
     
-    # 새 공고 추가 expander
+    # 새 공고 추가
     with st.expander("➕ 새 공고 추가하기"):
         with st.form("new_job_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             new_title = col1.text_input("직군명 *", placeholder="예: 인바운드 상담원")
             new_category = col2.selectbox("카테고리", ["IB상담", "OB상담", "채팅상담", "사무직", "기타"])
+            
+            # 🏢 센터 선택
+            active_centers = get_active_centers()
+            if active_centers:
+                center_options = {c['id']: c['name'] for c in active_centers}
+                new_center_id = st.selectbox(
+                    "근무 센터 *",
+                    options=list(center_options.keys()),
+                    format_func=lambda x: center_options[x],
+                )
+            else:
+                new_center_id = None
+                st.warning("⚠️ 등록된 센터가 없습니다. '🏢 센터 관리' 탭에서 먼저 센터를 추가해주세요.")
             
             col1, col2, col3 = st.columns(3)
             new_subway_line = col1.text_input("지하철 노선", placeholder="예: 2호선")
@@ -158,7 +169,6 @@ with tab2:
                 if not new_title or not new_salary:
                     st.error("직군명과 급여는 필수입니다.")
                 else:
-                    # 이미지 업로드 처리
                     if img_method == "파일 업로드" and uploaded_file:
                         file_bytes = uploaded_file.getvalue()
                         new_image_url = upload_image(file_bytes, uploaded_file.name) or ""
@@ -166,9 +176,10 @@ with tab2:
                     data = {
                         "title": new_title,
                         "category": new_category,
+                        "center_id": new_center_id,
                         "subway_line": new_subway_line,
                         "subway_station": new_subway_station,
-                        "location": new_location or f"{new_subway_station} 인근" if new_subway_station else "",
+                        "location": new_location or (f"{new_subway_station} 인근" if new_subway_station else ""),
                         "salary": new_salary,
                         "work_hours": new_hours,
                         "work_days": new_days,
@@ -199,7 +210,6 @@ with tab2:
     else:
         for job in jobs:
             with st.expander(f"**{job['title']}** — {job['status']}", expanded=False):
-                # 이미지 미리보기
                 if job.get('image_url'):
                     st.image(job['image_url'], width=200)
                 
@@ -209,8 +219,27 @@ with tab2:
                     ed_category = col2.selectbox(
                         "카테고리",
                         ["IB상담", "OB상담", "채팅상담", "사무직", "기타"],
-                        index=["IB상담", "OB상담", "채팅상담", "사무직", "기타"].index(job['category']) if job.get('category') in ["IB상담", "OB상담", "채팅상담", "사무직", "기타"] else 0
+                        index=["IB상담", "OB상담", "채팅상담", "사무직", "기타"].index(job['category']) if job.get('category') in ["IB상담", "OB상담", "채팅상담", "사무직", "기타"] else 0,
+                        key=f"cat_{job['id']}"
                     )
+                    
+                    # 🏢 센터 선택 (수정)
+                    active_centers_list = get_active_centers()
+                    if active_centers_list:
+                        center_opts = {c['id']: c['name'] for c in active_centers_list}
+                        current_center_id = job.get('center_id')
+                        current_idx = 0
+                        if current_center_id in center_opts:
+                            current_idx = list(center_opts.keys()).index(current_center_id)
+                        ed_center_id = st.selectbox(
+                            "근무 센터",
+                            options=list(center_opts.keys()),
+                            format_func=lambda x: center_opts[x],
+                            index=current_idx,
+                            key=f"center_{job['id']}",
+                        )
+                    else:
+                        ed_center_id = job.get('center_id')
                     
                     col1, col2, col3 = st.columns(3)
                     ed_subway_line = col1.text_input("노선", value=job.get('subway_line') or "")
@@ -262,7 +291,6 @@ with tab2:
                     delete_btn = col3.form_submit_button("🗑️ 삭제", use_container_width=True)
                     
                     if save_btn:
-                        # 이미지 처리
                         final_image_url = ed_image_url
                         if img_action == "새 파일 업로드" and new_upload:
                             final_image_url = upload_image(new_upload.getvalue(), new_upload.name) or ed_image_url
@@ -272,6 +300,7 @@ with tab2:
                         data = {
                             "title": ed_title,
                             "category": ed_category,
+                            "center_id": ed_center_id,
                             "subway_line": ed_subway_line,
                             "subway_station": ed_subway_station,
                             "location": ed_location,
@@ -303,13 +332,126 @@ with tab2:
                             st.error(f"삭제 실패: {e}")
 
 # =============================================================
-# TAB 3: FAQ 관리
+# TAB 3: 센터 관리 (NEW!)
 # =============================================================
 with tab3:
+    st.subheader("🏢 센터 관리")
+    st.caption("근무지(센터)를 추가/수정합니다. 각 공고는 하나의 센터에 연결됩니다.")
+    
+    # 새 센터 추가
+    with st.expander("➕ 새 센터 추가"):
+        with st.form("new_center_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            nc_name = col1.text_input("센터 이름 *", placeholder="예: 윌앤비전 강남센터")
+            nc_phone = col2.text_input("대표 연락처", placeholder="02-XXX-XXXX")
+            
+            nc_address = st.text_input("주소 *", placeholder="예: 서울특별시 강남구 테헤란로 123")
+            nc_detail = st.text_input("상세 안내", placeholder="예: XX빌딩 5층, 역에서 도보 3분")
+            
+            col1, col2 = st.columns(2)
+            nc_subway = col1.text_input("지하철 정보", placeholder="예: 2호선 강남역 3번 출구")
+            nc_bus = col2.text_input("버스 정보", placeholder="예: 강남역 정류장 (간선 143, 362)")
+            
+            nc_desc = st.text_area("센터 설명", placeholder="이 센터에서 운영하는 업무 등")
+            
+            col1, col2 = st.columns(2)
+            nc_parking = col1.checkbox("🚗 주차 가능")
+            nc_active = col2.checkbox("✅ 활성화", value=True)
+            
+            nc_order = st.number_input("표시 순서 (작을수록 위)", min_value=0, value=99)
+            
+            submitted = st.form_submit_button("💾 센터 등록", type="primary", use_container_width=True)
+            if submitted:
+                if not nc_name or not nc_address:
+                    st.error("센터 이름과 주소는 필수입니다.")
+                else:
+                    try:
+                        create_center({
+                            "name": nc_name,
+                            "address": nc_address,
+                            "detail_address": nc_detail,
+                            "phone": nc_phone,
+                            "subway_info": nc_subway,
+                            "bus_info": nc_bus,
+                            "description": nc_desc,
+                            "parking_available": nc_parking,
+                            "is_active": nc_active,
+                            "display_order": nc_order,
+                        })
+                        st.success("✅ 센터가 등록되었습니다!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"등록 실패: {e}")
+    
+    st.divider()
+    
+    # 기존 센터 목록
+    st.markdown("### 📋 등록된 센터")
+    centers = get_all_centers()
+    
+    if not centers:
+        st.info("등록된 센터가 없습니다. 위에서 추가해주세요.")
+    else:
+        for c in centers:
+            status_badge = "🟢 활성" if c.get('is_active') else "⚫ 비활성"
+            with st.expander(f"**{c['name']}** — {status_badge}", expanded=False):
+                with st.form(f"edit_center_{c['id']}"):
+                    col1, col2 = st.columns(2)
+                    ec_name = col1.text_input("이름", value=c['name'])
+                    ec_phone = col2.text_input("연락처", value=c.get('phone') or "")
+                    
+                    ec_address = st.text_input("주소", value=c['address'])
+                    ec_detail = st.text_input("상세 안내", value=c.get('detail_address') or "")
+                    
+                    col1, col2 = st.columns(2)
+                    ec_subway = col1.text_input("지하철", value=c.get('subway_info') or "")
+                    ec_bus = col2.text_input("버스", value=c.get('bus_info') or "")
+                    
+                    ec_desc = st.text_area("설명", value=c.get('description') or "")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    ec_parking = col1.checkbox("🚗 주차 가능", value=c.get('parking_available', False), key=f"parking_{c['id']}")
+                    ec_active = col2.checkbox("✅ 활성화", value=c.get('is_active', True), key=f"active_{c['id']}")
+                    ec_order = col3.number_input("순서", min_value=0, value=c.get('display_order') or 0, key=f"c_order_{c['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    save_btn = col1.form_submit_button("💾 저장", type="primary", use_container_width=True)
+                    delete_btn = col2.form_submit_button("🗑️ 삭제", use_container_width=True)
+                    
+                    if save_btn:
+                        try:
+                            update_center(c['id'], {
+                                "name": ec_name,
+                                "address": ec_address,
+                                "detail_address": ec_detail,
+                                "phone": ec_phone,
+                                "subway_info": ec_subway,
+                                "bus_info": ec_bus,
+                                "description": ec_desc,
+                                "parking_available": ec_parking,
+                                "is_active": ec_active,
+                                "display_order": ec_order,
+                            })
+                            st.success("✅ 수정 완료!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"실패: {e}")
+                    
+                    if delete_btn:
+                        try:
+                            delete_center(c['id'])
+                            st.success("🗑️ 삭제됨")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"실패: {e}. 이 센터에 연결된 공고가 있을 수 있어요.")
+
+# =============================================================
+# TAB 4: FAQ 관리
+# =============================================================
+with tab4:
     st.subheader("❓ FAQ 관리")
     st.caption("자주 묻는 질문을 추가/수정하세요. 메인 페이지 하단과 챗봇 학습 자료로 사용됩니다.")
     
-    # 새 FAQ 추가
     with st.expander("➕ 새 FAQ 추가"):
         with st.form("new_faq_form", clear_on_submit=True):
             col1, col2 = st.columns([1, 2])
@@ -344,7 +486,6 @@ with tab3:
     
     st.divider()
     
-    # 기존 FAQ 목록
     kb_items = get_all_knowledge()
     if not kb_items:
         st.info("등록된 FAQ가 없습니다.")
@@ -389,9 +530,9 @@ with tab3:
                         st.rerun()
 
 # =============================================================
-# TAB 4: 사이트 설정
+# TAB 5: 사이트 설정
 # =============================================================
-with tab4:
+with tab5:
     st.subheader("⚙️ 사이트 설정")
     st.caption("첫화면 문구, 담당자 정보, 연락처 등을 편집합니다.")
     
@@ -427,11 +568,9 @@ with tab4:
         )
         
         st.divider()
-        st.markdown("### 🗺️ 사무실 위치")
-        new_address = st.text_input("사무실 주소", value=settings.get('office_address', ''))
-        col1, col2 = st.columns(2)
-        new_lat = col1.text_input("위도 (거리 계산용)", value=settings.get('office_latitude', ''))
-        new_lng = col2.text_input("경도 (거리 계산용)", value=settings.get('office_longitude', ''))
+        st.markdown("### 🗺️ 기본 사무실 위치")
+        st.caption("💡 센터별 위치는 '🏢 센터 관리' 탭에서 설정")
+        new_address = st.text_input("기본 사무실 주소", value=settings.get('office_address', ''))
         
         st.divider()
         st.markdown("### 🤖 챗봇 설정")
@@ -462,8 +601,6 @@ with tab4:
                 'default_google_form_url': new_default_form,
                 'kakao_openchat_url': new_openchat,
                 'office_address': new_address,
-                'office_latitude': new_lat,
-                'office_longitude': new_lng,
                 'chatbot_tone': new_tone,
                 'chatbot_auto_apply_prompt': 'true' if new_auto_apply else 'false',
             }
@@ -476,9 +613,9 @@ with tab4:
                 st.error(f"저장 실패: {e}")
 
 # =============================================================
-# TAB 5: 지원자 명단
+# TAB 6: 지원자 명단
 # =============================================================
-with tab5:
+with tab6:
     st.subheader("👥 지원자 명단")
     
     st.info("💡 **추천**: 지원서는 **구글폼**으로 받는 것이 보안상 안전합니다. ⚙️ 사이트 설정 탭에서 구글폼 URL을 설정하세요.")
@@ -513,9 +650,9 @@ with tab5:
         st.info("아직 Streamlit 내부 지원자가 없습니다. 구글폼 지원자는 구글시트에서 확인하세요.")
 
 # =============================================================
-# TAB 6: 대화 기록
+# TAB 7: 대화 기록
 # =============================================================
-with tab6:
+with tab7:
     st.subheader("💬 AI 챗봇 대화 기록")
     conversations = get_all_conversations()
     
@@ -540,7 +677,6 @@ with tab6:
             "담당자필요": "✅" if c['needs_human'] else "",
         } for c in conversations])
         
-        # 담당자 필요한 것만 필터링 옵션
         show_only_needs_human = st.checkbox("⚠️ 담당자 연결 필요한 것만 보기")
         if show_only_needs_human:
             df = df[df['담당자필요'] == '✅']
