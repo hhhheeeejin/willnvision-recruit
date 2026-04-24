@@ -521,23 +521,23 @@ with tab4:
         st.info("등록된 FAQ가 없습니다.")
     else:
         for item in kb_items:
-            with st.expander(f"**[{item.get('category', '기타')}]** {item.get('question', '(질문 없음)')[:40]}..."):
-                with st.form(f"edit_faq_{item['id']}"):
-                    ed_q = st.text_input("질문", value=item.get('question') or "")
-                    ed_a = st.text_area("답변", value=item.get('answer') or "")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    ed_cat = col1.selectbox(
-                        "카테고리",
-                        ["회사소개", "담당자", "지원방법", "근무조건", "기타"],
-                        index=["회사소개", "담당자", "지원방법", "근무조건", "기타"].index(item.get('category')) if item.get('category') in ["회사소개", "담당자", "지원방법", "근무조건", "기타"] else 4,
-                        key=f"cat_{item['id']}"
-                    )
-                    ed_order = col2.number_input("순서", min_value=0, value=item.get('display_order') or 0, key=f"ord_{item['id']}")
-                    
-                    col1, col2 = st.columns(2)
-                    ed_show = col1.checkbox("FAQ에 표시", value=item.get('show_in_faq', True), key=f"show_{item['id']}")
-                    ed_active = col2.checkbox("활성화", value=item.get('is_active', True), key=f"act_{item['id']}")
+    with st.expander(f"**[{item.get('category', '기타')}]** {item.get('question', '(질문 없음)')[:40]}..."):
+        with st.form(f"edit_faq_{item['id']}"):
+            ed_q = st.text_input("질문", value=item.get('question') or "")
+            ed_a = st.text_area("답변", value=item.get('answer') or "")
+            
+            col1, col2, col3 = st.columns(3)
+            ed_cat = col1.selectbox(
+                "카테고리",
+                ["회사소개", "담당자", "지원방법", "근무조건", "기타"],
+                index=["회사소개", "담당자", "지원방법", "근무조건", "기타"].index(item.get('category')) if item.get('category') in ["회사소개", "담당자", "지원방법", "근무조건", "기타"] else 4,
+                key=f"faq_cat_{item['id']}"
+            )
+            ed_order = col2.number_input("순서", min_value=0, value=item.get('display_order') or 0, key=f"faq_ord_{item['id']}")
+            
+            col1, col2 = st.columns(2)
+            ed_show = col1.checkbox("FAQ에 표시", value=item.get('show_in_faq', True), key=f"faq_show_{item['id']}")
+            ed_active = col2.checkbox("활성화", value=item.get('is_active', True), key=f"faq_act_{item['id']}")
                     
                     col1, col2 = st.columns(2)
                     save = col1.form_submit_button("💾 저장", type="primary", use_container_width=True)
