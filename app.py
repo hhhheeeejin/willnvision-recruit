@@ -35,7 +35,7 @@ if "active_tab" not in st.session_state:
 settings = get_site_settings()
 hero_title = settings.get('hero_title', '윌앤비전 채용팀')
 hero_subtitle = settings.get('hero_subtitle', '수시채용 진행중')
-hero_emoji = settings.get('hero_emoji', '🏢')
+hero_emoji = settings.get('hero_emoji', '🤖')
 hero_image = settings.get('hero_image_url', '')
 manager_name = settings.get('manager_name', '담당자')
 manager_phone = settings.get('manager_phone', '010-9467-6139')
@@ -59,43 +59,316 @@ bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에�
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # ============================================
-# CSS 스타일
+# CSS 스타일 - 밝은 블루 + 귀여운 느낌
 # ============================================
 st.markdown("""
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" rel="stylesheet">
 <style>
+/* 전체 폰트 */
+html, body, [class*="css"] {
+    font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
+    letter-spacing: -0.4px;
+}
+
 .block-container {
     padding-top: 1rem !important;
     padding-bottom: 3rem !important;
     max-width: 640px !important;
 }
+
+/* 🎯 히어로 영역 - 밝은 블루 */
 .hero-section {
     text-align: center;
-    padding: 1.5rem 1rem 1.8rem;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 20px;
-    margin-bottom: 1.2rem;
+    padding: 2.2rem 1.2rem 2rem;
+    background: linear-gradient(160deg, #4285F4 0%, #2563EB 100%);
+    border-radius: 28px;
+    margin-bottom: 1.3rem;
     color: white;
+    box-shadow: 0 8px 28px rgba(66, 133, 244, 0.3);
+    position: relative;
+    overflow: hidden;
 }
-.hero-emoji { font-size: 2.8rem; margin-bottom: 0.3rem; }
-.hero-title { font-size: 1.4rem; font-weight: 700; margin: 0.25rem 0; color: white; }
-.hero-subtitle { font-size: 0.9rem; opacity: 0.95; margin: 0.25rem 0; }
-.hero-phone { font-size: 0.82rem; opacity: 0.85; margin-top: 0.3rem; }
-.section-header {
-    font-size: 1.05rem;
+
+.hero-section::before {
+    content: "🎁";
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 1.5rem;
+    opacity: 0.4;
+    transform: rotate(15deg);
+}
+
+.hero-section::after {
+    content: "✨";
+    position: absolute;
+    bottom: 30px;
+    left: 20px;
+    font-size: 1.3rem;
+    opacity: 0.4;
+}
+
+.hero-emoji {
+    font-size: 3rem;
+    margin-bottom: 0.5rem;
+    filter: drop-shadow(0 3px 6px rgba(0,0,0,0.15));
+    position: relative;
+    z-index: 1;
+}
+
+.hero-title {
+    font-size: 1.7rem;
+    font-weight: 900;
+    margin: 0.3rem 0;
+    color: white;
+    letter-spacing: -1px;
+    line-height: 1.2;
+    position: relative;
+    z-index: 1;
+}
+
+.hero-subtitle {
+    font-size: 1rem;
+    color: white;
+    opacity: 0.95;
+    margin: 0.4rem 0;
     font-weight: 600;
-    margin: 1.2rem 0 0.6rem;
-    padding-left: 0.6rem;
-    border-left: 4px solid #764ba2;
+    position: relative;
+    z-index: 1;
 }
+
+.hero-phone {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.22);
+    padding: 0.4rem 1rem;
+    border-radius: 20px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    margin-top: 0.7rem;
+    position: relative;
+    z-index: 1;
+}
+
+/* 🎯 섹션 헤더 */
+.section-header {
+    font-size: 1.15rem;
+    font-weight: 800;
+    margin: 1.5rem 0 0.8rem;
+    padding-left: 0.6rem;
+    color: #1E40AF;
+    letter-spacing: -0.6px;
+    position: relative;
+}
+
+.section-header::before {
+    content: "";
+    position: absolute;
+    left: -4px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 5px;
+    height: 22px;
+    background: linear-gradient(180deg, #4285F4 0%, #1E40AF 100%);
+    border-radius: 5px;
+}
+
+/* 💙 공고 카드 (expander) - 컴팩트하게 */
+[data-testid="stExpander"] {
+    background: white !important;
+    border: 2px solid #DBEAFE !important;
+    border-radius: 14px !important;
+    margin-bottom: 0.5rem !important;
+    box-shadow: 0 2px 8px rgba(66, 133, 244, 0.06) !important;
+    transition: all 0.2s;
+}
+
+[data-testid="stExpander"]:hover {
+    transform: translateY(-1px);
+    border-color: #93C5FD !important;
+    box-shadow: 0 4px 14px rgba(66, 133, 244, 0.15) !important;
+}
+
+[data-testid="stExpander"] summary {
+    padding: 0.7rem 1rem !important;
+    font-weight: 800 !important;
+    color: #1E3A8A !important;
+    font-size: 0.95rem !important;
+    letter-spacing: -0.4px;
+    list-style: none !important;
+    cursor: pointer;
+    position: relative;
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+}
+
+[data-testid="stExpander"] summary::-webkit-details-marker {
+    display: none !important;
+}
+
+[data-testid="stExpander"] summary::marker {
+    display: none !important;
+}
+
+/* ▼ 드롭다운 아이콘 */
+[data-testid="stExpander"] summary::after {
+    content: "▼";
+    font-size: 0.7rem;
+    color: #4285F4;
+    transition: transform 0.25s ease;
+    margin-left: 0.5rem;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+[data-testid="stExpander"][open] summary::after {
+    transform: rotate(180deg);
+}
+
+[data-testid="stExpander"] summary p {
+    color: #1E3A8A !important;
+    font-weight: 800 !important;
+    margin: 0 !important;
+    flex: 1;
+}
+
+/* 🔘 버튼 */
+.stButton > button {
+    border-radius: 14px !important;
+    font-weight: 700 !important;
+    border: 2px solid transparent !important;
+    transition: all 0.2s !important;
+    letter-spacing: -0.4px !important;
+    padding: 0.55rem 1rem !important;
+}
+
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #4285F4 0%, #2563EB 100%) !important;
+    color: white !important;
+    box-shadow: 0 3px 10px rgba(66, 133, 244, 0.3) !important;
+}
+
+.stButton > button[kind="primary"]:hover {
+    background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 5px 16px rgba(66, 133, 244, 0.4) !important;
+}
+
+.stButton > button[kind="secondary"] {
+    background: white !important;
+    color: #1E40AF !important;
+    border: 2px solid #DBEAFE !important;
+}
+
+.stButton > button[kind="secondary"]:hover {
+    background: #EFF6FF !important;
+    border-color: #93C5FD !important;
+    color: #1D4ED8 !important;
+}
+
+/* 🔗 링크 버튼 */
+.stLinkButton > a > button {
+    border-radius: 14px !important;
+    font-weight: 700 !important;
+    letter-spacing: -0.4px !important;
+}
+
+.stLinkButton > a > button[kind="primary"] {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+    color: white !important;
+    border: none !important;
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3) !important;
+}
+
+/* 📝 입력창 */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea {
+    border-radius: 14px !important;
+    border: 2px solid #DBEAFE !important;
+    background: white !important;
+    font-weight: 500 !important;
+}
+
+.stTextInput > div > div > input:focus,
+.stTextArea > div > div > textarea:focus {
+    border-color: #4285F4 !important;
+    box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.15) !important;
+}
+
+/* 💬 챗봇 인사말 박스 */
+.cute-greeting {
+    background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+    border-radius: 22px;
+    padding: 1.4rem 1rem;
+    text-align: center;
+    margin: 0.5rem 0;
+    border: 2px solid rgba(66, 133, 244, 0.15);
+}
+
+.cute-greeting-emoji {
+    font-size: 2.5rem;
+    margin-bottom: 0.4rem;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.cute-greeting-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #1E40AF;
+    letter-spacing: -0.5px;
+}
+
+.cute-greeting-sub {
+    font-size: 0.88rem;
+    color: #3B82F6;
+    margin-top: 0.3rem;
+    font-weight: 600;
+}
+
+/* 💙 chat message */
+[data-testid="stChatMessage"] {
+    background: #F8FAFC !important;
+    border-radius: 16px !important;
+    padding: 0.8rem !important;
+}
+
+/* 🎉 푸터 */
 .footer {
     text-align: center;
-    padding: 1.2rem 0;
-    color: #94a3b8;
-    font-size: 0.75rem;
+    padding: 1.5rem 0 1rem;
+    color: #64748B;
+    font-size: 0.8rem;
+    font-weight: 500;
 }
+
+/* 📦 caption 색상 */
+[data-testid="stCaptionContainer"] {
+    color: #64748B !important;
+}
+
+/* 모바일 최적화 */
 @media (max-width: 640px) {
-    .hero-emoji { font-size: 2.3rem; }
-    .hero-title { font-size: 1.2rem; }
+    .hero-emoji { font-size: 2.6rem; }
+    .hero-title { font-size: 1.5rem; }
+    .section-header { font-size: 1.05rem; }
+}
+
+/* 다크모드 대응 */
+@media (prefers-color-scheme: dark) {
+    [data-testid="stExpander"] {
+        background: #1E293B !important;
+        border-color: #334155 !important;
+    }
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary p {
+        color: #F1F5F9 !important;
+    }
+    .cute-greeting {
+        background: linear-gradient(135deg, #1E3A8A 0%, #1E40AF 100%);
+    }
+    .cute-greeting-title {
+        color: white !important;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -260,10 +533,10 @@ if st.session_state.active_tab == "chat":
     
     # 귀여운 인사말
     st.markdown(
-        f'<div style="text-align: center; padding: 0.8rem 0 0.5rem;">'
-        f'<div style="font-size: 2rem; margin-bottom: 0.3rem;">{bot_emoji}</div>'
-        f'<div style="font-size: 1.05rem; font-weight: 600; color: #4c1d95;">{bot_greeting}</div>'
-        f'<div style="font-size: 0.85rem; color: #64748b; margin-top: 0.2rem;">{bot_sub}</div>'
+        f'<div class="cute-greeting">'
+        f'<div class="cute-greeting-emoji">{bot_emoji}</div>'
+        f'<div class="cute-greeting-title">{bot_greeting}</div>'
+        f'<div class="cute-greeting-sub">{bot_sub}</div>'
         f'</div>',
         unsafe_allow_html=True
     )
@@ -418,11 +691,12 @@ elif st.session_state.active_tab == "distance":
             naver_url = f"https://map.naver.com/p/directions/-/{end_enc}/{naver_mode}"
             
             result_html = (
-                '<div style="background: linear-gradient(135deg, #ddd6fe 0%, #c7d2fe 100%); '
-                'padding: 1rem; border-radius: 12px; text-align: center; margin: 0.5rem 0;">'
-                f'<div style="font-size: 0.85rem; color: #4c1d95;">🏠 {start_address}</div>'
-                '<div style="margin: 0.3rem 0;">⬇️</div>'
-                f'<div style="font-weight: 600; color: #312e81;">🏢 {selected_center["name"]}</div>'
+                '<div style="background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); '
+                'padding: 1.2rem; border-radius: 16px; text-align: center; margin: 0.5rem 0; '
+                'border: 2px solid rgba(66, 133, 244, 0.15);">'
+                f'<div style="font-size: 0.9rem; color: #1E40AF; font-weight: 600;">🏠 {start_address}</div>'
+                '<div style="margin: 0.3rem 0; color: #4285F4;">⬇️</div>'
+                f'<div style="font-weight: 700; color: #1E3A8A; font-size: 1rem;">🏢 {selected_center["name"]}</div>'
                 '</div>'
             )
             st.markdown(result_html, unsafe_allow_html=True)
@@ -449,10 +723,12 @@ elif st.session_state.active_tab == "contact":
     
     with col1:
         kakao_card = (
-            '<div style="background: #fef3c7; padding: 1.2rem; border-radius: 12px; text-align: center;">'
+            '<div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); '
+            'padding: 1.3rem; border-radius: 16px; text-align: center; '
+            'border: 2px solid rgba(251, 191, 36, 0.3);">'
             '<div style="font-size: 2.5rem;">💬</div>'
-            '<div style="font-weight: 600; margin-top: 0.3rem;">카카오톡</div>'
-            '<div style="font-size: 0.72rem; color: #92400e;">빠른 답변</div>'
+            '<div style="font-weight: 700; margin-top: 0.3rem; color: #92400E;">카카오톡</div>'
+            '<div style="font-size: 0.75rem; color: #B45309; font-weight: 500;">빠른 답변</div>'
             '</div>'
         )
         st.markdown(kakao_card, unsafe_allow_html=True)
@@ -463,10 +739,12 @@ elif st.session_state.active_tab == "contact":
     
     with col2:
         phone_card = (
-            '<div style="background: #dbeafe; padding: 1.2rem; border-radius: 12px; text-align: center;">'
+            '<div style="background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); '
+            'padding: 1.3rem; border-radius: 16px; text-align: center; '
+            'border: 2px solid rgba(66, 133, 244, 0.2);">'
             '<div style="font-size: 2.5rem;">📞</div>'
-            '<div style="font-weight: 600; margin-top: 0.3rem;">전화</div>'
-            '<div style="font-size: 0.72rem; color: #1e40af;">즉시 상담</div>'
+            '<div style="font-weight: 700; margin-top: 0.3rem; color: #1E40AF;">전화</div>'
+            '<div style="font-size: 0.75rem; color: #2563EB; font-weight: 500;">즉시 상담</div>'
             '</div>'
         )
         st.markdown(phone_card, unsafe_allow_html=True)
