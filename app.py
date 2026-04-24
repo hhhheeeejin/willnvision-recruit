@@ -295,32 +295,54 @@ if st.session_state.active_tab == "chat":
             f"6. 개인정보 수집 금지 - '개인정보는 지원서에서 받아요'"
         )
     
-    st.markdown("#### 🤖 AI 채용 상담사 '윌비'")
-    st.caption("궁금한 점을 편하게 물어보세요")
-    
-    # 추천 질문
+    # 챗봇 설정 가져오기
+bot_emoji = settings.get('chatbot_emoji', '🤖')
+bot_name = settings.get('chatbot_name', '윌비봇')
+bot_greeting = settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요 ●'◡'●")
+bot_sub = settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!')
+bot_placeholder = settings.get('chatbot_placeholder', '편하게 질문 주세요... 🙌')
+bot_empty = settings.get('chatbot_empty_msg', '💬 대화를 시작해주세요!')
+bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요... 💭')
+
+# 귀여운 인사말 (크게)
+st.markdown(f"""
+<div style="text-align: center; padding: 0.8rem 0 0.5rem;">
+    <div style="font-size: 2rem; margin-bottom: 0.3rem;">{bot_emoji}</div>
+    <div style="font-size: 1.05rem; font-weight: 600; color: #4c1d95;">{bot_greeting}</div>
+    <div style="font-size: 0.85rem; color: #64748b; margin-top: 0.2rem;">{bot_sub}</div>
+</div>
+""", unsafe_allow_html=True)
+
+# 추천 질문
+if not st.session_state.messages:
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.caption("🔥 이런 걸 많이 물어봐요")
+    sug_col1, sug_col2 = st.columns(2)
+    suggested_questions = [
+        settings.get('suggested_q_1', '신입도 가능해요?'),
+        settings.get('suggested_q_2', '재택 있나요?'),
+        settings.get('suggested_q_3', '급여 얼마에요?'),
+        settings.get('suggested_q_4', '교육 기간은?'),
+    ]
+    for idx, q in enumerate(suggested_questions):
+        with sug_col1 if idx % 2 == 0 else sug_col2:
+            if st.button(q, key=f"sug_{idx}", use_container_width=True):
+                st.session_state.preset_question = q
+                st.rerun()
+
+# 대화 화면
+chat_container = st.container(border=True, height=350)
+with chat_container:
     if not st.session_state.messages:
-        sug_col1, sug_col2 = st.columns(2)
-        suggested_questions = ["신입도 가능해요?", "재택 있나요?", "급여 얼마에요?", "교육 기간은?"]
-        for idx, q in enumerate(suggested_questions):
-            with sug_col1 if idx % 2 == 0 else sug_col2:
-                if st.button(q, key=f"sug_{idx}", use_container_width=True):
-                    st.session_state.preset_question = q
-                    st.rerun()
-    
-    # 대화 화면
-    chat_container = st.container(border=True, height=350)
-    with chat_container:
-        if not st.session_state.messages:
-            st.caption("💬 대화를 시작해주세요!")
-        for msg in st.session_state.messages:
-            avatar = "🤖" if msg["role"] == "assistant" else None
-            with st.chat_message(msg["role"], avatar=avatar):
-                st.markdown(msg["content"])
-    
-    # 메시지 입력
-    preset = st.session_state.pop("preset_question", None)
-    user_input = preset or st.chat_input("질문 입력... 🙌")
+        st.caption(bot_empty)
+    for msg in st.session_state.messages:
+        avatar = bot_emoji if msg["role"] == "assistant" else None
+        with st.chat_message(msg["role"], avatar=avatar):
+            st.markdown(msg["content"])
+
+# 메시지 입력
+preset = st.session_state.pop("preset_question", None)
+user_input = preset or st.chat_input(bot_placeholder)
     
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
@@ -330,8 +352,8 @@ if st.session_state.active_tab == "chat":
             chat_history = [{"role": "system", "content": system_prompt}]
             chat_history.extend(st.session_state.messages[-8:])
             
-            with st.spinner("윌비가 생각 중... 💭"):
-                response = client.chat.completions.create(
+            with st.spinner(bot_thinking):
+    response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=chat_history,
                     temperature=0.7,
