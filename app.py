@@ -1,7 +1,8 @@
 import streamlit as st
 import uuid
+import urllib.parse
 from utils.db import (
-    get_active_jobs, get_setting, get_faq_items, 
+    get_active_jobs_with_center, get_setting, get_faq_items, 
     increment_job_view, get_site_settings
 )
 
@@ -72,9 +73,8 @@ st.markdown("""
         font-size: 1.15rem;
         font-weight: 600;
         margin: 1.5rem 0 0.75rem;
-        padding-left: 0.25rem;
-        border-left: 4px solid #764ba2;
         padding-left: 0.75rem;
+        border-left: 4px solid #764ba2;
     }
     
     /* 공고 카드 */
@@ -141,14 +141,6 @@ st.markdown("""
         gap: 0.5rem;
     }
     
-    /* 빠른 메뉴 버튼 */
-    .quick-menu {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 0.75rem;
-        margin: 1rem 0;
-    }
-    
     /* FAQ */
     .faq-item {
         background: #f8fafc;
@@ -207,7 +199,7 @@ st.markdown(f"""
 # ============ 모집 공고 ============
 st.markdown('<div class="section-header">📌 모집 중인 공고</div>', unsafe_allow_html=True)
 
-jobs = get_active_jobs()
+jobs = get_active_jobs_with_center()
 
 if not jobs:
     st.info("현재 모집 중인 공고가 없습니다. 곧 새 공고가 오픈될 예정입니다.")
@@ -220,10 +212,17 @@ else:
             emoji = '📞' if job.get('category') == 'OB상담' else '📱'
             image_html = f'<div class="job-image-placeholder">{emoji}</div>'
         
+        # 센터 정보
+        center_info = ""
+        if job.get('centers'):
+            center_info = f"🏢 {job['centers']['name']}"
+        
         # 지하철 정보
         subway_info = ""
         if job.get('subway_station'):
             subway_info = f"🚇 {job.get('subway_line', '')} {job['subway_station']}"
+        elif job.get('centers') and job['centers'].get('subway_info'):
+            subway_info = f"🚇 {job['centers']['subway_info']}"
         
         # 카드 HTML
         st.markdown(f"""
@@ -233,6 +232,7 @@ else:
                 <span class="job-badge">● {job['status']}</span>
                 <div class="job-title">{job['title']}</div>
                 <div class="job-meta">
+                    {f'<div class="job-meta-item">{center_info}</div>' if center_info else ''}
                     <div class="job-meta-item">📍 {job.get('location', '')}</div>
                     <div class="job-meta-item">💰 {job.get('salary', '')}</div>
                     <div class="job-meta-item">⏰ {job.get('work_hours', '')} · {job.get('work_days', '')}</div>
@@ -256,8 +256,7 @@ else:
             if apply_url:
                 st.link_button("📝 지원하기", apply_url, use_container_width=True, type="primary")
             else:
-                if st.button("📝 지원하기", key=f"apply_{job['id']}", use_container_width=True, type="primary"):
-                    st.switch_page("pages/2_간편지원.py")
+                st.button("📝 지원 준비중", key=f"apply_{job['id']}", use_container_width=True, disabled=True)
 
 # ============ 빠른 메뉴 ============
 st.markdown('<div class="section-header">⚡ 빠른 메뉴</div>', unsafe_allow_html=True)
@@ -276,9 +275,27 @@ with col1:
         st.switch_page("pages/3_출근거리.py")
 with col2:
     if office_address:
-        import urllib.parse
         encoded_address = urllib.parse.quote(office_address)
         map_url = f"https://map.kakao.com/?q={encoded_address}"
         st.link_button("🗺️ 오시는 길", map_url, use_container_width=True)
     else:
         st.link_button("🗺️ 오시는 길", "https://map.kakao.com/", use_container_width=True)
+
+# ============ FAQ ============
+faqs = get_faq_items()
+if faqs:
+    st.markdown('<div class="section-header">💡 자주 묻는 질문</div>', unsafe_allow_html=True)
+    
+    for faq in faqs[:5]:  # 최대 5개만
+        with st.expander(f"❓ {faq.get('question', '')}"):
+            st.write(faq.get('answer', ''))
+
+# ============ 푸터 ============
+st.markdown(f"""
+<div class="footer">
+    💬 궁금한 점은 AI 상담사가 24시간 답변해드립니다<br>
+    📞 {manager_name} · {manager_phone}<br>
+    <br>
+    © 윌앤비전 채용팀
+</div>
+""", unsafe_allow_html=True)
