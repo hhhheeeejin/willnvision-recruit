@@ -4,7 +4,7 @@ import urllib.parse
 from openai import OpenAI
 from utils.db import (
     get_active_jobs_with_center, get_faq_items, 
-    increment_job_view, get_site_settings,
+    increment_job_view, increment_job_apply, get_site_settings,
     get_active_jobs, get_knowledge_base, save_conversation,
     get_active_centers,
 )
@@ -145,7 +145,7 @@ st.markdown(
 )
 
 # ============================================
-# 모집 공고 목록
+# 모집 공고 목록 (드롭다운)
 # ============================================
 st.markdown('<div class="section-header">📌 모집 중인 공고</div>', unsafe_allow_html=True)
 
@@ -155,69 +155,66 @@ if not jobs:
     st.info("현재 모집 중인 공고가 없습니다.")
 else:
     for job in jobs:
-        # 이미지 HTML
-        if job.get('image_url'):
-            image_html = f'<img src="{job["image_url"]}" class="job-image" alt="{job["title"]}">'
-        else:
-            emoji_icon = '📞' if job.get('category') == 'OB상담' else '📱'
-            image_html = f'<div class="job-image-placeholder">{emoji_icon}</div>'
+        # 상태 배지
+        status_emoji = "🟢" if job['status'] == '모집중' else ("🟡" if job['status'] == '재오픈예정' else "⚫")
         
-        # 센터 정보
-        center_info = ""
-        if job.get('centers'):
-            center_info = f"🏢 {job['centers']['name']}"
-        
-        # 지하철 정보
-        subway_info = ""
-        if job.get('subway_station'):
-            subway_info = f"🚇 {job.get('subway_line', '')} {job['subway_station']}"
-        elif job.get('centers') and job['centers'].get('subway_info'):
-            subway_info = f"🚇 {job['centers']['subway_info']}"
-        
-        # 메타 정보 조립
-        meta_items = []
-        if center_info:
-            meta_items.append(f'<div class="job-meta-item">{center_info}</div>')
-        if job.get('location'):
-            meta_items.append(f'<div class="job-meta-item">📍 {job.get("location")}</div>')
-        if job.get('salary'):
-            meta_items.append(f'<div class="job-meta-item">💰 {job.get("salary")}</div>')
-        if job.get('work_hours') or job.get('work_days'):
-            meta_items.append(f'<div class="job-meta-item">⏰ {job.get("work_hours", "")} · {job.get("work_days", "")}</div>')
-        if job.get('education_period'):
-            meta_items.append(f'<div class="job-meta-item">📅 교육 {job["education_period"]}</div>')
-        if subway_info:
-            meta_items.append(f'<div class="job-meta-item">{subway_info}</div>')
-        meta_html = "".join(meta_items)
-        
-        # 카드 HTML
-        card_html = (
-            f'<div class="job-card">'
-            f'{image_html}'
-            f'<div class="job-content">'
-            f'<span class="job-badge">● {job["status"]}</span>'
-            f'<div class="job-title">{job["title"]}</div>'
-            f'<div class="job-meta">{meta_html}</div>'
-            f'</div>'
-            f'</div>'
-        )
-        st.markdown(card_html, unsafe_allow_html=True)
-        
-        # 액션 버튼
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("💬 이 공고 문의", key=f"chat_{job['id']}", use_container_width=True):
-                st.session_state['preset_question'] = f"{job['title']} 공고에 대해 알려주세요"
-                st.session_state['preset_job_id'] = job['id']
-                st.session_state.active_tab = "chat"
-                increment_job_view(job['id'], st.session_state.session_id)
-                st.rerun()
-        with col2:
-            apply_url = job.get('google_form_url') or default_form_url
-            if apply_url:
-                st.link_button("📝 지원하기", apply_url, use_container_width=True, type="primary")
-            else:
-                st.button("📝 지원 준비중", key=f"apply_{job['id']}", use_container_width=True, disabled=True)
+        # 드롭다운 (expander)
+        with st.expander(f"{status_emoji} **{job['title']}**", expanded=False):
+            
+            # 이미지 표시
+            if job.get('image_url'):
+                st.image(job['image_url'], use_container_width=True)
+            
+            # 상세 정보
+            detail_lines = []
+            if job.get('centers'):
+                detail_lines.append(f"🏢 **{job['centers']['name']}**")
+            if job.get('location'):
+                detail_lines.append(f"📍 {job.get('location')}")
+            if job.get('salary'):
+                detail_lines.append(f"💰 {job.get('salary')}")
+            if job.get('work_hours') or job.get('work_days'):
+                detail_lines.append(f"⏰ {job.get('work_hours', '')} · {job.get('work_days', '')}")
+            if job.get('education_period'):
+                detail_lines.append(f"📅 교육 {job['education_period']}")
+            if job.get('subway_station'):
+                detail_lines.append(f"🚇 {job.get('subway_line', '')} {job['subway_station']}")
+            elif job.get('centers') and job['centers'].get('subway_info'):
+                detail_lines.append(f"🚇 {job['centers']['subway_info']}")
+            if job.get('features'):
+                detail_lines.append(f"✨ {job['features']}")
+            
+            for line in detail_lines:
+                st.markdown(line)
+            
+            # 설명 (있으면)
+            if job.get('description'):
+                st.markdown("---")
+                st.caption(job['description'])
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            # 액션 버튼
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("💬 이 공고 문의", key=f"chat_{job['id']}", use_container_width=True):
+                    st.session_state['preset_question'] = f"{job['title']} 공고에 대해 알려주세요"
+                    st.session_state['preset_job_id'] = job['id']
+                    st.session_state.active_tab = "chat"
+                    increment_job_view(job['id'], st.session_state.session_id)
+                    st.rerun()
+            with col2:
+                apply_url = job.get('google_form_url') or default_form_url
+                if apply_url:
+                    # 지원 버튼 클릭 시 카운트 증가 후 링크 열기
+                    if st.button("📝 지원하기", key=f"apply_{job['id']}", use_container_width=True, type="primary"):
+                        increment_job_apply(job['id'], st.session_state.session_id)
+                        # JavaScript로 새 탭에서 열기
+                        st.markdown(f'<meta http-equiv="refresh" content="0; url={apply_url}">', unsafe_allow_html=True)
+                        st.success(f"지원 페이지로 이동 중...")
+                        st.markdown(f"자동 이동 안 되면 [여기 클릭]({apply_url})")
+                else:
+                    st.button("📝 지원 준비중", key=f"apply_{job['id']}", use_container_width=True, disabled=True)
 
 # ============================================
 # 기능 탭 선택
