@@ -262,18 +262,19 @@ else:
 # ============ 빠른 메뉴 ============
 st.markdown('<div class="section-header">⚡ 빠른 메뉴</div>', unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3)
+col1, col2 = st.columns(2)
 with col1:
-    if st.button("💬\nAI 상담", use_container_width=True):
+    if st.button("💬 AI 상담사", use_container_width=True, type="primary"):
         st.switch_page("pages/1_AI_상담사.py")
 with col2:
-    openchat_url = settings.get('kakao_openchat_url', '')
-    if openchat_url:
-        st.link_button("💬 오픈채팅", openchat_url, use_container_width=True)
-    else:
-        phone_clean = manager_phone.replace('-','')
-        st.link_button("📞 전화문의", f"tel:{phone_clean}", use_container_width=True)
-with col3:
+    if st.button("🙋 담당자 연결", use_container_width=True):
+        st.switch_page("pages/4_담당자연결.py")
+
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("🚇 출근 거리 확인", use_container_width=True):
+        st.switch_page("pages/3_출근거리.py")
+with col2:
     if office_address:
         import urllib.parse
         encoded_address = urllib.parse.quote(office_address)
