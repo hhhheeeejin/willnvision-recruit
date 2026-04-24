@@ -466,11 +466,11 @@ elif st.session_state.active_tab == "distance":
 
 
 # ============================================
-# 탭 3: 담당자 연결
+# 탭 3: 지원 문의
 # ============================================
 elif st.session_state.active_tab == "contact":
-    st.markdown("#### 🙋 담당자와 직접 대화")
-    st.caption(f"{manager_name}님이 빠르게 답변드려요!")
+    st.markdown("#### 🙋 지원 문의")
+    st.caption(f"{manager_name}님께 직접 문의하세요!")
     
     col1, col2 = st.columns(2)
     
