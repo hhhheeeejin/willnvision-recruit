@@ -577,36 +577,93 @@ with tab5:
         new_address = st.text_input("기본 사무실 주소", value=settings.get('office_address', ''))
         
         st.divider()
-        st.markdown("### 🤖 챗봇 설정")
-        new_tone = st.selectbox(
-            "말투 스타일",
-            ["friendly", "casual", "formal"],
-            format_func=lambda x: {"friendly": "😊 친근하게", "casual": "🙌 편하게", "formal": "🎩 격식있게"}[x],
-            index=["friendly", "casual", "formal"].index(settings.get('chatbot_tone', 'friendly'))
-        )
-        new_auto_apply = st.checkbox(
-            "대화 중 자동 지원 유도",
-            value=settings.get('chatbot_auto_apply_prompt', 'true') == 'true',
-        )
+st.markdown("### 🤖 챗봇 설정")
+st.caption("챗봇 이름, 인사말, 추천 질문 등을 꾸밀 수 있어요!")
+
+col1, col2 = st.columns([1, 3])
+new_bot_emoji = col1.text_input("챗봇 이모지", value=settings.get('chatbot_emoji', '🤖'))
+new_bot_name = col2.text_input("챗봇 이름", value=settings.get('chatbot_name', '윌비봇'))
+
+new_greeting = st.text_input(
+    "메인 인사말",
+    value=settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요 ●'◡'●"),
+    help="챗봇 상단에 큰 글씨로 표시되는 문구"
+)
+new_sub_greeting = st.text_input(
+    "서브 인사말",
+    value=settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!'),
+    help="인사말 아래 작은 글씨"
+)
+
+col1, col2 = st.columns(2)
+new_placeholder = col1.text_input(
+    "입력창 안내",
+    value=settings.get('chatbot_placeholder', '편하게 질문 주세요... 🙌'),
+    help="질문 입력란에 나타나는 안내 문구"
+)
+new_empty_msg = col2.text_input(
+    "빈 대화 문구",
+    value=settings.get('chatbot_empty_msg', '💬 대화를 시작해주세요!'),
+    help="대화가 없을 때 보여줄 문구"
+)
+
+new_thinking_msg = st.text_input(
+    "답변 대기 문구",
+    value=settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요... 💭'),
+    help="AI가 답변 만드는 동안 보여줄 문구"
+)
+
+st.markdown("**💡 추천 질문 (챗봇 시작 시 표시)**")
+col1, col2 = st.columns(2)
+new_sug_q1 = col1.text_input("추천 질문 1", value=settings.get('suggested_q_1', '신입도 가능해요?'))
+new_sug_q2 = col2.text_input("추천 질문 2", value=settings.get('suggested_q_2', '재택 있나요?'))
+col1, col2 = st.columns(2)
+new_sug_q3 = col1.text_input("추천 질문 3", value=settings.get('suggested_q_3', '급여 얼마에요?'))
+new_sug_q4 = col2.text_input("추천 질문 4", value=settings.get('suggested_q_4', '교육 기간은?'))
+
+st.markdown("**🎭 말투 & 동작**")
+new_tone = st.selectbox(
+    "말투 스타일",
+    ["friendly", "casual", "formal"],
+    format_func=lambda x: {"friendly": "😊 친근하게", "casual": "🙌 편하게", "formal": "🎩 격식있게"}[x],
+    index=["friendly", "casual", "formal"].index(settings.get('chatbot_tone', 'friendly'))
+)
+new_auto_apply = st.checkbox(
+    "대화 중 자동 지원 유도",
+    value=settings.get('chatbot_auto_apply_prompt', 'true') == 'true',
+    help="대화가 충분히 오가면 지원서 링크를 표시"
+)
         
         submitted = st.form_submit_button("💾 모든 설정 저장", type="primary", use_container_width=True)
         
         if submitted:
-            updates = {
-                'hero_emoji': new_emoji,
-                'hero_title': new_title,
-                'hero_subtitle': new_subtitle,
-                'hero_image_url': new_hero_img,
-                'company_intro': new_intro,
-                'manager_name': new_m_name,
-                'manager_phone': new_m_phone,
-                'manager_email': new_m_email,
-                'default_google_form_url': new_default_form,
-                'kakao_openchat_url': new_openchat,
-                'office_address': new_address,
-                'chatbot_tone': new_tone,
-                'chatbot_auto_apply_prompt': 'true' if new_auto_apply else 'false',
-            }
+    updates = {
+        'hero_emoji': new_emoji,
+        'hero_title': new_title,
+        'hero_subtitle': new_subtitle,
+        'hero_image_url': new_hero_img,
+        'company_intro': new_intro,
+        'manager_name': new_m_name,
+        'manager_phone': new_m_phone,
+        'manager_email': new_m_email,
+        'default_google_form_url': new_default_form,
+        'kakao_openchat_url': new_openchat,
+        'office_address': new_address,
+        # 챗봇 설정
+        'chatbot_name': new_bot_name,
+        'chatbot_emoji': new_bot_emoji,
+        'chatbot_greeting': new_greeting,
+        'chatbot_sub_greeting': new_sub_greeting,
+        'chatbot_placeholder': new_placeholder,
+        'chatbot_empty_msg': new_empty_msg,
+        'chatbot_thinking_msg': new_thinking_msg,
+        'suggested_q_1': new_sug_q1,
+        'suggested_q_2': new_sug_q2,
+        'suggested_q_3': new_sug_q3,
+        'suggested_q_4': new_sug_q4,
+        'chatbot_tone': new_tone,
+        'chatbot_auto_apply_prompt': 'true' if new_auto_apply else 'false',
+    }
             try:
                 for k, v in updates.items():
                     update_setting(k, v)
