@@ -248,7 +248,6 @@ st.markdown("<br>", unsafe_allow_html=True)
 # ============================================
 if st.session_state.active_tab == "chat":
     
-    @st.cache_data(ttl=60)
     def build_system_prompt():
         active_jobs_list = get_active_jobs()
         kb = get_knowledge_base()
