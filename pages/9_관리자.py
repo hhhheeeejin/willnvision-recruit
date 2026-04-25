@@ -10,6 +10,7 @@ from utils.db import (
     upload_image,
     get_stats, get_popular_jobs,
     get_all_centers, create_center, update_center, delete_center, get_active_centers,
+    get_all_center_faqs, create_center_faq, update_center_faq, delete_center_faq,
 )
 
 st.set_page_config(page_title="관리자", page_icon="🔐", layout="wide")
@@ -39,7 +40,6 @@ check_password()
 st.title("🔐 윌앤비전 채용 관리자")
 st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-# 탭 6개 (지원자 명단 제외)
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 대시보드",
     "📋 공고 관리",
@@ -86,7 +86,7 @@ with tab1:
         df_stats = df_stats.sort_values("💬 문의 클릭", ascending=False)
         st.dataframe(df_stats, use_container_width=True, hide_index=True)
         
-        st.caption("💡 전환율 = 지원 클릭 ÷ 문의 클릭 × 100 (높을수록 실제 지원까지 잘 이어진 공고)")
+        st.caption("💡 전환율 = 지원 클릭 ÷ 문의 클릭 × 100")
     
     st.divider()
     
@@ -107,7 +107,7 @@ with tab1:
     with col2:
         st.subheader("⚠️ 담당자 연결 필요")
         st.metric("담당자 연결 요청", f"{stats['needs_human_count']:,}건")
-        st.caption("AI가 답변 못한 질문들입니다. 💬 대화기록 탭에서 확인하세요.")
+        st.caption("AI가 답변 못한 질문들. 💬 대화기록 탭에서 확인하세요.")
 
 # =============================================================
 # TAB 2: 공고 관리
@@ -115,28 +115,65 @@ with tab1:
 with tab2:
     st.subheader("📋 공고 관리")
     
+    # ============ 새 공고 추가 ============
     with st.expander("➕ 새 공고 추가하기"):
+        
+        # 폼 밖에서 센터 선택 (선택값을 폼 안에서 사용 가능)
+        active_centers = get_active_centers()
+        if active_centers:
+            center_options = {c['id']: c['name'] for c in active_centers}
+            new_center_id = st.selectbox(
+                "🏢 근무 센터 선택 *",
+                options=list(center_options.keys()),
+                format_func=lambda x: center_options[x],
+                key="new_job_center_select",
+                help="등록된 센터에서 선택하세요. 선택하면 주소/지하철 정보가 자동으로 채워집니다."
+            )
+            
+            # 선택된 센터 정보 미리보기
+            selected_center = next((c for c in active_centers if c['id'] == new_center_id), None)
+            if selected_center:
+                info_text = f"**{selected_center['name']}**\n\n"
+                info_text += f"📍 주소: {selected_center.get('address', '')}\n\n"
+                if selected_center.get('subway_info'):
+                    info_text += f"🚇 지하철: {selected_center.get('subway_info', '')}\n\n"
+                if selected_center.get('phone'):
+                    info_text += f"📞 연락처: {selected_center.get('phone', '')}"
+                st.info(info_text)
+        else:
+            new_center_id = None
+            selected_center = None
+            st.warning("⚠️ 등록된 센터가 없습니다. '🏢 센터 관리' 탭에서 먼저 센터를 추가해주세요.")
+        
         with st.form("new_job_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             new_title = col1.text_input("직군명 *", placeholder="예: 인바운드 상담원")
             new_category = col2.selectbox("카테고리", ["IB상담", "OB상담", "채팅상담", "사무직", "기타"])
             
-            active_centers = get_active_centers()
-            if active_centers:
-                center_options = {c['id']: c['name'] for c in active_centers}
-                new_center_id = st.selectbox(
-                    "근무 센터 *",
-                    options=list(center_options.keys()),
-                    format_func=lambda x: center_options[x],
-                )
-            else:
-                new_center_id = None
-                st.warning("⚠️ 등록된 센터가 없습니다. '🏢 센터 관리' 탭에서 먼저 센터를 추가해주세요.")
+            # 센터 정보로 자동 채우기
+            default_subway_line = ""
+            default_subway_station = ""
+            default_location = ""
+            
+            if selected_center:
+                subway_info = selected_center.get('subway_info', '') or ""
+                if '호선' in subway_info:
+                    parts = subway_info.split(' ', 1)
+                    if len(parts) >= 1:
+                        default_subway_line = parts[0]
+                    if len(parts) >= 2:
+                        rest = parts[1]
+                        if '역' in rest:
+                            default_subway_station = rest.split('역')[0] + '역'
+                
+                default_location = f"{default_subway_station} 인근" if default_subway_station else selected_center.get('address', '')[:20]
+            
+            st.caption("💡 아래 정보는 선택한 센터 기반으로 자동 채워졌습니다. 필요시 수정 가능!")
             
             col1, col2, col3 = st.columns(3)
-            new_subway_line = col1.text_input("지하철 노선", placeholder="예: 2호선")
-            new_subway_station = col2.text_input("지하철역", placeholder="예: 문래역")
-            new_location = col3.text_input("근무지 상세", placeholder="예: 문래역 인근")
+            new_subway_line = col1.text_input("지하철 노선", value=default_subway_line, placeholder="예: 2호선")
+            new_subway_station = col2.text_input("지하철역", value=default_subway_station, placeholder="예: 문래역")
+            new_location = col3.text_input("근무지 상세", value=default_location, placeholder="예: 문래역 인근")
             
             col1, col2 = st.columns(2)
             new_salary = col1.text_input("급여 *", placeholder="예: 월 250만원")
@@ -175,6 +212,8 @@ with tab2:
             if submitted:
                 if not new_title or not new_salary:
                     st.error("직군명과 급여는 필수입니다.")
+                elif not new_center_id:
+                    st.error("근무 센터를 선택해주세요.")
                 else:
                     if img_method == "파일 업로드" and uploaded_file:
                         file_bytes = uploaded_file.getvalue()
@@ -208,6 +247,7 @@ with tab2:
     
     st.divider()
     
+    # ============ 등록된 공고 목록 ============
     st.markdown("### 📋 등록된 공고 목록")
     jobs = get_all_jobs()
     
@@ -237,7 +277,7 @@ with tab2:
                         if current_center_id in center_opts:
                             current_idx = list(center_opts.keys()).index(current_center_id)
                         ed_center_id = st.selectbox(
-                            "근무 센터",
+                            "🏢 근무 센터",
                             options=list(center_opts.keys()),
                             format_func=lambda x: center_opts[x],
                             index=current_idx,
@@ -340,7 +380,7 @@ with tab2:
 # =============================================================
 with tab3:
     st.subheader("🏢 센터 관리")
-    st.caption("근무지(센터)를 추가/수정합니다. 각 공고는 하나의 센터에 연결됩니다.")
+    st.caption("근무지(센터) 정보를 관리하고, 센터별 FAQ를 등록하세요.")
     
     with st.expander("➕ 새 센터 추가"):
         with st.form("new_center_form", clear_on_submit=True):
@@ -356,6 +396,13 @@ with tab3:
             nc_bus = col2.text_input("버스 정보", placeholder="예: 강남역 정류장 (간선 143, 362)")
             
             nc_desc = st.text_area("센터 설명", placeholder="이 센터에서 운영하는 업무 등")
+            
+            nc_info_note = st.text_area(
+                "📝 센터 고유 정보 (AI 챗봇 참조용)",
+                placeholder="휴게실 위치, 주차 정보, 분위기, 복리후생 등 자유롭게",
+                height=120,
+                help="AI 챗봇이 이 정보를 참조해서 센터 관련 질문에 답변합니다"
+            )
             
             col1, col2 = st.columns(2)
             nc_parking = col1.checkbox("🚗 주차 가능")
@@ -377,6 +424,7 @@ with tab3:
                             "subway_info": nc_subway,
                             "bus_info": nc_bus,
                             "description": nc_desc,
+                            "info_note": nc_info_note,
                             "parking_available": nc_parking,
                             "is_active": nc_active,
                             "display_order": nc_order,
@@ -397,6 +445,7 @@ with tab3:
         for c in centers:
             status_badge = "🟢 활성" if c.get('is_active') else "⚫ 비활성"
             with st.expander(f"**{c['name']}** — {status_badge}", expanded=False):
+                
                 with st.form(f"edit_center_{c['id']}"):
                     col1, col2 = st.columns(2)
                     ec_name = col1.text_input("이름", value=c['name'], key=f"ctr_name_{c['id']}")
@@ -410,6 +459,21 @@ with tab3:
                     ec_bus = col2.text_input("버스", value=c.get('bus_info') or "", key=f"ctr_bus_{c['id']}")
                     
                     ec_desc = st.text_area("설명", value=c.get('description') or "", key=f"ctr_desc_{c['id']}")
+                    
+                    ec_info_note = st.text_area(
+                        "📝 센터 고유 정보 (AI 챗봇 참조용)",
+                        value=c.get('info_note') or "",
+                        placeholder="""예:
+- 위치: 문래역 5번 출구 도보 3분
+- 휴게실: 3층 (자판기, 전자레인지)
+- 주차: 건물 뒤 3대 (선착순)
+- 분위기: 편안하고 수평적, 평균 30대
+- 점심: 1층 구내식당 or 근처 맛집
+- 복리후생: 월 교통비 지원, 간식 무한""",
+                        height=180,
+                        help="💡 이 내용을 바탕으로 AI 챗봇이 센터 관련 질문에 답변합니다",
+                        key=f"ctr_info_{c['id']}"
+                    )
                     
                     col1, col2, col3 = st.columns(3)
                     ec_parking = col1.checkbox("🚗 주차 가능", value=c.get('parking_available', False), key=f"ctr_parking_{c['id']}")
@@ -430,6 +494,7 @@ with tab3:
                                 "subway_info": ec_subway,
                                 "bus_info": ec_bus,
                                 "description": ec_desc,
+                                "info_note": ec_info_note,
                                 "parking_available": ec_parking,
                                 "is_active": ec_active,
                                 "display_order": ec_order,
@@ -446,13 +511,84 @@ with tab3:
                             st.rerun()
                         except Exception as e:
                             st.error(f"실패: {e}. 이 센터에 연결된 공고가 있을 수 있어요.")
+                
+                # ============ 센터별 FAQ ============
+                st.markdown("---")
+                st.markdown(f"#### ❓ {c['name']} 전용 FAQ")
+                st.caption("이 센터에만 해당하는 질문-답변을 등록하세요")
+                
+                with st.expander("➕ FAQ 추가"):
+                    with st.form(f"new_cfaq_{c['id']}", clear_on_submit=True):
+                        cfaq_q = st.text_input("질문", placeholder="예: 주차 가능해요?", key=f"ncf_q_{c['id']}")
+                        cfaq_a = st.text_area("답변", placeholder="예: 건물 뒤쪽에 3대 가능합니다", key=f"ncf_a_{c['id']}")
+                        cfaq_order = st.number_input("표시 순서", min_value=0, value=99, key=f"ncf_ord_{c['id']}")
+                        
+                        if st.form_submit_button("💾 등록", type="primary", use_container_width=True):
+                            if cfaq_q and cfaq_a:
+                                try:
+                                    create_center_faq({
+                                        "center_id": c['id'],
+                                        "question": cfaq_q,
+                                        "answer": cfaq_a,
+                                        "display_order": cfaq_order,
+                                        "is_active": True,
+                                    })
+                                    st.success("✅ FAQ 등록!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"실패: {e}")
+                            else:
+                                st.error("질문과 답변을 입력해주세요.")
+                
+                center_faqs_list = get_all_center_faqs(c['id'])
+                if center_faqs_list:
+                    for cfaq in center_faqs_list:
+                        active_badge = "🟢" if cfaq.get('is_active') else "⚫"
+                        with st.container(border=True):
+                            st.markdown(f"{active_badge} **Q:** {cfaq['question']}")
+                            st.caption(f"**A:** {cfaq['answer']}")
+                            
+                            col1, col2, col3 = st.columns([1, 1, 4])
+                            with col1:
+                                if st.button("✏️ 수정", key=f"cf_edit_{cfaq['id']}"):
+                                    st.session_state[f"edit_cfaq_{cfaq['id']}"] = True
+                                    st.rerun()
+                            with col2:
+                                if st.button("🗑️", key=f"cf_del_{cfaq['id']}"):
+                                    delete_center_faq(cfaq['id'])
+                                    st.success("삭제됨")
+                                    st.rerun()
+                            
+                            if st.session_state.get(f"edit_cfaq_{cfaq['id']}"):
+                                with st.form(f"edit_cfaq_form_{cfaq['id']}"):
+                                    new_q = st.text_input("질문", value=cfaq['question'], key=f"ecf_q_{cfaq['id']}")
+                                    new_a = st.text_area("답변", value=cfaq['answer'], key=f"ecf_a_{cfaq['id']}")
+                                    new_order = st.number_input("순서", value=cfaq.get('display_order', 0), key=f"ecf_ord_{cfaq['id']}")
+                                    new_active = st.checkbox("활성화", value=cfaq.get('is_active', True), key=f"ecf_act_{cfaq['id']}")
+                                    
+                                    sc1, sc2 = st.columns(2)
+                                    if sc1.form_submit_button("💾 저장", type="primary", use_container_width=True):
+                                        update_center_faq(cfaq['id'], {
+                                            "question": new_q,
+                                            "answer": new_a,
+                                            "display_order": new_order,
+                                            "is_active": new_active,
+                                        })
+                                        st.session_state[f"edit_cfaq_{cfaq['id']}"] = False
+                                        st.success("저장됨!")
+                                        st.rerun()
+                                    if sc2.form_submit_button("취소", use_container_width=True):
+                                        st.session_state[f"edit_cfaq_{cfaq['id']}"] = False
+                                        st.rerun()
+                else:
+                    st.caption("💡 등록된 FAQ가 없습니다. 위에서 추가해보세요.")
 
 # =============================================================
-# TAB 4: FAQ 관리
+# TAB 4: FAQ 관리 (공통)
 # =============================================================
 with tab4:
-    st.subheader("❓ FAQ 관리")
-    st.caption("자주 묻는 질문을 추가/수정하세요.")
+    st.subheader("❓ 공통 FAQ 관리")
+    st.caption("모든 센터에 해당하는 공통 질문-답변을 관리하세요. 센터별 FAQ는 '🏢 센터 관리'에서!")
     
     with st.expander("➕ 새 FAQ 추가"):
         with st.form("new_faq_form", clear_on_submit=True):
@@ -536,14 +672,14 @@ with tab4:
 # =============================================================
 with tab5:
     st.subheader("⚙️ 사이트 설정")
-    st.caption("첫화면 문구, 담당자 정보, 연락처 등을 편집합니다.")
+    st.caption("첫화면 문구, 담당자 정보, 챗봇 멘트 등을 편집합니다.")
     
     settings = get_site_settings()
     
     with st.form("settings_form"):
         st.markdown("### 🎨 메인 페이지")
         col1, col2 = st.columns([1, 3])
-        new_emoji = col1.text_input("대표 이모지", value=settings.get('hero_emoji', '🏢'))
+        new_emoji = col1.text_input("대표 이모지", value=settings.get('hero_emoji', '🤖'))
         new_title = col2.text_input("헤드라인 제목", value=settings.get('hero_title', ''))
         new_subtitle = st.text_input("서브타이틀", value=settings.get('hero_subtitle', ''))
         new_hero_img = st.text_input("상단 이미지 URL (선택)", value=settings.get('hero_image_url', ''))
@@ -561,22 +697,20 @@ with tab5:
         new_default_form = st.text_input(
             "기본 구글폼 URL",
             value=settings.get('default_google_form_url', ''),
-            help="공고별 구글폼이 없을 때 사용됩니다."
+            help="공고별 구글폼이 없을 때 사용"
         )
         new_openchat = st.text_input(
             "카카오 오픈채팅 URL",
             value=settings.get('kakao_openchat_url', ''),
-            help="지원자가 담당자와 직접 대화할 수 있는 오픈채팅방"
         )
         
         st.divider()
         st.markdown("### 🗺️ 기본 사무실 위치")
-        st.caption("💡 센터별 위치는 '🏢 센터 관리' 탭에서 설정")
         new_address = st.text_input("기본 사무실 주소", value=settings.get('office_address', ''))
         
         st.divider()
         st.markdown("### 🤖 챗봇 설정")
-        st.caption("챗봇 이름, 인사말, 추천 질문 등을 꾸밀 수 있어요!")
+        st.caption("챗봇 이름, 인사말, 추천 질문 등을 자유롭게 변경하세요!")
         
         col1, col2 = st.columns([1, 3])
         new_bot_emoji = col1.text_input("챗봇 이모지", value=settings.get('chatbot_emoji', '🤖'))
@@ -584,34 +718,32 @@ with tab5:
         
         new_greeting = st.text_input(
             "메인 인사말",
-            value=settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요 ●'◡'●"),
-            help="챗봇 상단에 큰 글씨로 표시되는 문구"
+            value=settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요"),
         )
         new_sub_greeting = st.text_input(
             "서브 인사말",
             value=settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!'),
-            help="인사말 아래 작은 글씨"
         )
         
         col1, col2 = st.columns(2)
         new_placeholder = col1.text_input(
             "입력창 안내",
-            value=settings.get('chatbot_placeholder', '편하게 질문 주세요... 🙌'),
+            value=settings.get('chatbot_placeholder', '편하게 질문 주세요...'),
         )
         new_empty_msg = col2.text_input(
             "빈 대화 문구",
-            value=settings.get('chatbot_empty_msg', '💬 대화를 시작해주세요!'),
+            value=settings.get('chatbot_empty_msg', '대화를 시작해주세요!'),
         )
         
         new_thinking_msg = st.text_input(
             "답변 대기 문구",
-            value=settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요... 💭'),
+            value=settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요...'),
         )
         
         st.markdown("**💡 추천 질문 (챗봇 시작 시 표시)**")
         col1, col2 = st.columns(2)
         new_sug_q1 = col1.text_input("추천 질문 1", value=settings.get('suggested_q_1', '신입도 가능해요?'))
-        new_sug_q2 = col2.text_input("추천 질문 2", value=settings.get('suggested_q_2', '재택 있나요?'))
+        new_sug_q2 = col2.text_input("추천 질문 2", value=settings.get('suggested_q_2', '나에게 맞는 채용은?'))
         col1, col2 = st.columns(2)
         new_sug_q3 = col1.text_input("추천 질문 3", value=settings.get('suggested_q_3', '급여 얼마에요?'))
         new_sug_q4 = col2.text_input("추천 질문 4", value=settings.get('suggested_q_4', '교육 기간은?'))
@@ -626,7 +758,6 @@ with tab5:
         new_auto_apply = st.checkbox(
             "대화 중 자동 지원 유도",
             value=settings.get('chatbot_auto_apply_prompt', 'true') == 'true',
-            help="대화가 충분히 오가면 지원서 링크를 표시"
         )
         
         submitted = st.form_submit_button("💾 모든 설정 저장", type="primary", use_container_width=True)
