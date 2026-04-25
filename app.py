@@ -6,12 +6,10 @@ from utils.db import (
     get_active_jobs_with_center, get_faq_items, 
     increment_job_view, increment_job_apply, get_site_settings,
     get_active_jobs, get_knowledge_base, save_conversation,
-    get_active_centers,
+    get_active_centers, get_center_faqs,
 )
 
-# ============================================
 # 페이지 설정
-# ============================================
 st.set_page_config(
     page_title="윌앤비전 채용",
     page_icon="📞",
@@ -19,9 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ============================================
 # 세션 초기화
-# ============================================
 if "session_id" not in st.session_state:
     st.session_state.session_id = str(uuid.uuid4())
 if "messages" not in st.session_state:
@@ -29,9 +25,7 @@ if "messages" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "chat"
 
-# ============================================
 # 사이트 설정 불러오기
-# ============================================
 settings = get_site_settings()
 hero_title = settings.get('hero_title', '윌앤비전 채용팀')
 hero_subtitle = settings.get('hero_subtitle', '수시채용 진행중')
@@ -52,14 +46,10 @@ bot_placeholder = settings.get('chatbot_placeholder', '편하게 질문 주세�
 bot_empty = settings.get('chatbot_empty_msg', '대화를 시작해주세요!')
 bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요...')
 
-# ============================================
-# OpenAI 클라이언트
-# ============================================
+# OpenAI
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# ============================================
-# CSS 스타일 (변수로 먼저 저장 - 렌더링 안전)
-# ============================================
+# CSS - 다크모드 대응 + 항상 잘 보이게
 CUSTOM_CSS = """
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" rel="stylesheet">
 <style>
@@ -72,6 +62,7 @@ html, body, [class*="css"] {
     padding-top: 1rem !important;
     padding-bottom: 3rem !important;
     max-width: 640px !important;
+    background: white !important;
 }
 
 .hero-section {
@@ -150,7 +141,7 @@ html, body, [class*="css"] {
     font-weight: 800;
     margin: 1.5rem 0 0.8rem;
     padding-left: 0.6rem;
-    color: #1E40AF;
+    color: #1E40AF !important;
     letter-spacing: -0.6px;
     position: relative;
 }
@@ -225,6 +216,12 @@ html, body, [class*="css"] {
     flex: 1;
 }
 
+[data-testid="stExpander"] [data-testid="stMarkdownContainer"] p,
+[data-testid="stExpander"] [data-testid="stMarkdownContainer"] li,
+[data-testid="stExpander"] [data-testid="stMarkdownContainer"] span {
+    color: #1E293B !important;
+}
+
 .stButton > button {
     border-radius: 14px !important;
     font-weight: 700 !important;
@@ -276,13 +273,8 @@ html, body, [class*="css"] {
     border-radius: 14px !important;
     border: 2px solid #DBEAFE !important;
     background: white !important;
+    color: #1E293B !important;
     font-weight: 500 !important;
-}
-
-.stTextInput > div > div > input:focus,
-.stTextArea > div > div > textarea:focus {
-    border-color: #4285F4 !important;
-    box-shadow: 0 0 0 4px rgba(66, 133, 244, 0.15) !important;
 }
 
 .cute-greeting {
@@ -302,13 +294,13 @@ html, body, [class*="css"] {
 .cute-greeting-title {
     font-size: 1.1rem;
     font-weight: 800;
-    color: #1E40AF;
+    color: #1E40AF !important;
     letter-spacing: -0.5px;
 }
 
 .cute-greeting-sub {
     font-size: 0.88rem;
-    color: #3B82F6;
+    color: #3B82F6 !important;
     margin-top: 0.3rem;
     font-weight: 600;
 }
@@ -319,22 +311,112 @@ html, body, [class*="css"] {
     padding: 0.8rem !important;
 }
 
+[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
+    color: #1E293B !important;
+}
+
 .footer {
     text-align: center;
     padding: 1.5rem 0 1rem;
-    color: #64748B;
+    color: #64748B !important;
     font-size: 0.8rem;
     font-weight: 500;
 }
 
+/* 모든 마크다운 텍스트 - 항상 어둡게 강제 */
+.stMarkdown p,
+.stMarkdown li,
+.stMarkdown span,
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] li,
+[data-testid="stMarkdownContainer"] span {
+    color: #1E293B !important;
+}
+
+/* caption */
+[data-testid="stCaptionContainer"] p,
 [data-testid="stCaptionContainer"] {
-    color: #64748B !important;
+    color: #475569 !important;
+}
+
+/* info / warning / success 박스 텍스트 */
+[data-testid="stAlert"] p,
+[data-testid="stAlert"] div {
+    color: #1E293B !important;
 }
 
 @media (max-width: 640px) {
     .hero-emoji { font-size: 2.6rem; }
     .hero-title { font-size: 1.5rem; }
     .section-header { font-size: 1.05rem; }
+}
+
+/* 다크모드에서도 흰 배경 + 어두운 글씨 강제 */
+@media (prefers-color-scheme: dark) {
+    .stApp {
+        background: white !important;
+    }
+    
+    .block-container {
+        background: white !important;
+    }
+    
+    [data-testid="stExpander"] {
+        background: white !important;
+    }
+    
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary p {
+        color: #1E3A8A !important;
+    }
+    
+    .stMarkdown p,
+    .stMarkdown li,
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] li,
+    [data-testid="stMarkdownContainer"] span {
+        color: #1E293B !important;
+    }
+    
+    .section-header {
+        color: #1E40AF !important;
+    }
+    
+    .cute-greeting-title {
+        color: #1E40AF !important;
+    }
+    
+    .cute-greeting-sub {
+        color: #3B82F6 !important;
+    }
+    
+    [data-testid="stCaptionContainer"],
+    [data-testid="stCaptionContainer"] p {
+        color: #475569 !important;
+    }
+    
+    [data-testid="stChatMessage"] {
+        background: #F8FAFC !important;
+    }
+    
+    [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
+        color: #1E293B !important;
+    }
+    
+    .stTextInput > div > div > input,
+    .stTextArea > div > div > textarea {
+        background: white !important;
+        color: #1E293B !important;
+    }
+    
+    [data-testid="stAlert"] p,
+    [data-testid="stAlert"] div {
+        color: #1E293B !important;
+    }
+    
+    .footer {
+        color: #64748B !important;
+    }
 }
 </style>
 """
@@ -355,12 +437,12 @@ HERO_HTML = (
     f'<div class="hero-phone">📞 {manager_name} · {manager_phone}</div>'
     '</div>'
 )
-st.markdown(HERO_HTML, unsafe_allow_html=True)
+st.html(HERO_HTML)
 
 # ============================================
 # 모집 공고 (드롭다운)
 # ============================================
-st.markdown('<div class="section-header">📌 모집 중인 공고</div>', unsafe_allow_html=True)
+st.html('<div class="section-header">📌 모집 중인 공고</div>')
 
 jobs = get_active_jobs_with_center()
 
@@ -423,7 +505,7 @@ else:
 # ============================================
 # 기능 탭 선택 (4개)
 # ============================================
-st.markdown('<div class="section-header">⚡ 기능 선택</div>', unsafe_allow_html=True)
+st.html('<div class="section-header">⚡ 기능 선택</div>')
 
 tab_cols = st.columns(4)
 
@@ -461,6 +543,7 @@ if st.session_state.active_tab == "chat":
     def build_system_prompt():
         active_jobs_list = get_active_jobs()
         kb = get_knowledge_base()
+        centers_list = get_active_centers()
         
         job_lines = []
         for j in active_jobs_list:
@@ -478,6 +561,34 @@ if st.session_state.active_tab == "chat":
         kb_lines = [f"Q: {k.get('question', '')}\nA: {k.get('answer', '')}" for k in kb]
         kb_info = "\n".join(kb_lines)
         
+        center_info_lines = []
+        for c in centers_list:
+            ci = f"\n━━━━━ [{c['name']}] ━━━━━\n"
+            ci += f"주소: {c.get('address', '')}\n"
+            if c.get('detail_address'):
+                ci += f"상세: {c['detail_address']}\n"
+            if c.get('subway_info'):
+                ci += f"지하철: {c['subway_info']}\n"
+            if c.get('bus_info'):
+                ci += f"버스: {c['bus_info']}\n"
+            if c.get('parking_available'):
+                ci += "주차: 가능\n"
+            if c.get('info_note'):
+                ci += f"\n[센터 고유 정보]\n{c['info_note']}\n"
+            
+            try:
+                c_faqs = get_center_faqs(c['id'])
+                if c_faqs:
+                    ci += f"\n[{c['name']} 자주 묻는 질문]\n"
+                    for cf in c_faqs:
+                        ci += f"Q: {cf['question']}\nA: {cf['answer']}\n"
+            except Exception:
+                pass
+            
+            center_info_lines.append(ci)
+        
+        centers_text = "\n".join(center_info_lines)
+        
         tone_guide = {
             'friendly': '말투: 친근하고 따뜻하게. 공감 먼저, 정보 나중. 이모지 자연스럽게.',
             'casual': '말투: 편하고 짧게.',
@@ -488,15 +599,17 @@ if st.session_state.active_tab == "chat":
             f"당신은 윌앤비전 채용팀 AI 상담사 '{bot_name}'입니다.\n"
             f"{tone_guide}\n\n"
             f"[모집 공고]\n{job_info}\n\n"
-            f"[FAQ]\n{kb_info}\n\n"
+            f"[공통 FAQ]\n{kb_info}\n\n"
+            f"[센터 정보]\n{centers_text}\n\n"
             f"[담당자]\n- {manager_name} / {manager_phone}\n\n"
             f"[규칙]\n"
             f"1. 위 정보 안에서만 답변\n"
             f"2. 답변 끝에 '더 궁금한 점 있으세요? 😊'\n"
-            f"3. 지원 의사 보이면 지원서 안내\n"
-            f"4. 공고 밖 질문은 담당자 연결 안내\n"
-            f"5. 짧고 모바일 친화적으로\n"
-            f"6. 개인정보 수집 금지 - '개인정보는 지원서에서 받아요'"
+            f"3. 센터 관련 질문 → 해당 센터 정보 정확히 답변\n"
+            f"4. 지원 의사 보이면 지원서 안내\n"
+            f"5. 공고 밖 질문은 담당자 연결 안내\n"
+            f"6. 짧고 모바일 친화적으로\n"
+            f"7. 개인정보 수집 금지"
         )
     
     GREETING_HTML = (
@@ -506,7 +619,7 @@ if st.session_state.active_tab == "chat":
         f'<div class="cute-greeting-sub">{bot_sub}</div>'
         '</div>'
     )
-    st.markdown(GREETING_HTML, unsafe_allow_html=True)
+    st.html(GREETING_HTML)
     
     if not st.session_state.messages:
         st.markdown("<br>", unsafe_allow_html=True)
@@ -514,7 +627,7 @@ if st.session_state.active_tab == "chat":
         sug_col1, sug_col2 = st.columns(2)
         suggested_questions = [
             settings.get('suggested_q_1', '신입도 가능해요?'),
-            settings.get('suggested_q_2', '재택 있나요?'),
+            settings.get('suggested_q_2', '나에게 맞는 채용은?'),
             settings.get('suggested_q_3', '급여 얼마에요?'),
             settings.get('suggested_q_4', '교육 기간은?'),
         ]
@@ -524,7 +637,7 @@ if st.session_state.active_tab == "chat":
                     st.session_state.preset_question = q
                     st.rerun()
     
-    chat_container = st.container(border=True, height=150)
+    chat_container = st.container(border=True, height=250)
     with chat_container:
         if not st.session_state.messages:
             st.caption(bot_empty)
@@ -662,7 +775,7 @@ elif st.session_state.active_tab == "distance":
                 f'<div style="font-weight: 700; color: #1E3A8A; font-size: 1rem;">🏢 {selected_center["name"]}</div>'
                 '</div>'
             )
-            st.markdown(RESULT_HTML, unsafe_allow_html=True)
+            st.html(RESULT_HTML)
             
             col1, col2 = st.columns(2)
             with col1:
@@ -694,7 +807,7 @@ elif st.session_state.active_tab == "contact":
             '<div style="font-size: 0.75rem; color: #B45309; font-weight: 500;">빠른 답변</div>'
             '</div>'
         )
-        st.markdown(KAKAO_CARD, unsafe_allow_html=True)
+        st.html(KAKAO_CARD)
         if openchat_url:
             st.link_button("오픈채팅 →", openchat_url, type="primary", use_container_width=True)
         else:
@@ -710,7 +823,7 @@ elif st.session_state.active_tab == "contact":
             '<div style="font-size: 0.75rem; color: #2563EB; font-weight: 500;">즉시 상담</div>'
             '</div>'
         )
-        st.markdown(PHONE_CARD, unsafe_allow_html=True)
+        st.html(PHONE_CARD)
         phone_clean = manager_phone.replace('-', '')
         st.link_button(f"{manager_phone}", f"tel:{phone_clean}", use_container_width=True)
 
@@ -719,7 +832,7 @@ elif st.session_state.active_tab == "contact":
 # ============================================
 faqs = get_faq_items()
 if faqs:
-    st.markdown('<div class="section-header">💡 자주 묻는 질문</div>', unsafe_allow_html=True)
+    st.html('<div class="section-header">💡 자주 묻는 질문</div>')
     for faq in faqs[:5]:
         with st.expander(f"❓ {faq.get('question', '')}"):
             st.write(faq.get('answer', ''))
@@ -735,4 +848,4 @@ FOOTER_HTML = (
     '© 윌앤비전 채용팀'
     '</div>'
 )
-st.markdown(FOOTER_HTML, unsafe_allow_html=True)
+st.html(FOOTER_HTML)
