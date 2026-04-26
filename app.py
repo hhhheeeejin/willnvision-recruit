@@ -844,20 +844,32 @@ if faqs:
 # 주의사항 박스 (관리자 설정값 사용)
 notice_text = settings.get('notice_text', '')
 if notice_text:
+    # ※ 마다 줄바꿈 자동 처리
+    formatted_notice = notice_text.replace('※ ', '<br>※ ').replace('• ', '<br>• ').strip()
+    if formatted_notice.startswith('<br>'):
+        formatted_notice = formatted_notice[4:]
+    
     NOTICE_HTML = (
         '<div style="'
-        'background: #EFF6FF; '
-        'border: 1px solid #BFDBFE; '
-        'border-radius: 14px; '
-        'padding: 1rem 1.2rem; '
-        'margin: 1.5rem 0 1rem; '
-        'color: #1E3A8A; '
-        'font-size: 0.78rem; '
-        'line-height: 1.7; '
-        'font-weight: 500;'
+        'background: transparent; '
+        'border-top: none; '
+        'padding-top: 0.5rem; '
+        'padding: 1rem 0.5rem 0.5rem; '
+        'margin: 1.5rem 0 0.5rem; '
+        'color: #CBD5E1; '      
+        'font-size: 0.65rem; '
+        'line-height: 1.4; '
+        'font-weight: 400;'
         '">'
-        '<div style="font-weight: 700; margin-bottom: 0.4rem;">🛡️ 채용 안내</div>'
-        f'{notice_text}'
+        '<div style="'
+        'font-weight: 600; '
+        'font-size: 0.72rem; '
+        'color: #94A3B8; '
+        'margin-bottom: 0.5rem;'
+        '">'
+        '채용 안내'
+        '</div>'
+        f'<div style="color: #94A3B8;">{formatted_notice}</div>'
         '</div>'
     )
     st.html(NOTICE_HTML)
