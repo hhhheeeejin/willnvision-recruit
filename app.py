@@ -699,6 +699,35 @@ elif st.session_state.active_tab == "distance":
     st.markdown("#### 🚇 출근 경로 확인")
     st.caption("집 주소 / 역 이름을 입력하세요")
     
+    # 🔧 디버그 모드 시작
+    st.warning("🔧 디버그 정보")
+    
+    try:
+        debug_centers = get_active_centers()
+        st.success(f"✅ 함수 호출 성공! 가져온 센터 수: **{len(debug_centers)}**")
+        
+        if debug_centers:
+            st.write("**📋 가져온 센터 목록:**")
+            for dc in debug_centers:
+                st.write(f"- ID: {dc.get('id')}, 이름: {dc.get('name')}, active: {dc.get('is_active')}, 주소: {dc.get('address', 'N/A')}")
+        else:
+            st.error("❌ 센터 리스트가 비어있어요!")
+            
+            # 추가 진단: 모든 센터 가져오기
+            from utils.db import get_all_centers
+            all_centers = get_all_centers()
+            st.write(f"**🔍 추가 진단**: get_all_centers() = {len(all_centers)}개")
+            for ac in all_centers:
+                st.write(f"  - {ac.get('name')} | active: {ac.get('is_active')} (타입: {type(ac.get('is_active')).__name__})")
+                
+    except Exception as e:
+        st.error(f"❌ 오류 발생: {e}")
+        import traceback
+        st.code(traceback.format_exc())
+    
+    st.divider()
+    # 🔧 디버그 모드 끝
+    
     start_address = st.text_input(
         "출발지",
         placeholder="예: 강남역, 서울역, 홍대입구역",
