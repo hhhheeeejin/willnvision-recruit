@@ -1,884 +1,834 @@
 import streamlit as st
-import uuid
-import urllib.parse
-from openai import OpenAI
+import pandas as pd
+from datetime import datetime
+from io import BytesIO
 from utils.db import (
-    get_active_jobs_with_center, get_faq_items, 
-    increment_job_view, increment_job_apply, get_site_settings,
-    get_active_jobs, get_knowledge_base, save_conversation,
-    get_active_centers, get_center_faqs,
+    get_all_jobs, create_job, update_job, delete_job,
+    get_all_conversations,
+    get_all_knowledge, create_knowledge, update_knowledge, delete_knowledge,
+    get_site_settings, update_setting,
+    get_stats, get_popular_jobs,
+    get_all_centers, create_center, update_center, delete_center, get_active_centers,
+    get_all_center_faqs, create_center_faq, update_center_faq, delete_center_faq,
 )
 
-# 페이지 설정
-st.set_page_config(
-    page_title="윌앤비전 채용",
-    page_icon="📞",
-    layout="centered",
-    initial_sidebar_state="collapsed",
-)
-
-# 세션 초기화
-if "session_id" not in st.session_state:
-    st.session_state.session_id = str(uuid.uuid4())
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-if "active_tab" not in st.session_state:
-    st.session_state.active_tab = "chat"
-
-# 사이트 설정 불러오기
-settings = get_site_settings()
-hero_title = settings.get('hero_title', '윌앤비전 채용팀')
-hero_subtitle = settings.get('hero_subtitle', '수시채용 진행중')
-hero_emoji = settings.get('hero_emoji', '🤖')
-hero_image = settings.get('hero_image_url', '')
-manager_name = settings.get('manager_name', '담당자')
-manager_phone = settings.get('manager_phone', '010-9467-6139')
-office_address = settings.get('office_address', '')
-default_form_url = settings.get('default_google_form_url', '')
-openchat_url = settings.get('kakao_openchat_url', '')
-tone = settings.get('chatbot_tone', 'friendly')
-
-bot_emoji = settings.get('chatbot_emoji', '🤖')
-bot_name = settings.get('chatbot_name', '윌비봇')
-bot_greeting = settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요")
-bot_sub = settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!')
-bot_placeholder = settings.get('chatbot_placeholder', '편하게 질문 주세요...')
-bot_empty = settings.get('chatbot_empty_msg', '대화를 시작해주세요!')
-bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요...')
-
-# OpenAI
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-
-# CSS
-CUSTOM_CSS = """
-<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" rel="stylesheet">
-<style>
-html, body, [class*="css"] {
-    font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
-    letter-spacing: -0.4px;
-}
-
-.block-container {
-    padding-top: 1rem !important;
-    padding-bottom: 3rem !important;
-    max-width: 640px !important;
-    background: white !important;
-}
-
-.hero-section {
-    text-align: center;
-    padding: 2.2rem 1.2rem 2rem;
-    background: linear-gradient(160deg, #4285F4 0%, #2563EB 100%);
-    border-radius: 28px;
-    margin-bottom: 1.3rem;
-    color: white;
-    box-shadow: 0 8px 28px rgba(66, 133, 244, 0.3);
-    position: relative;
-    overflow: hidden;
-}
-
-.hero-section::before {
-    content: "🎁";
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    font-size: 1.5rem;
-    opacity: 0.4;
-    transform: rotate(15deg);
-}
-
-.hero-section::after {
-    content: "✨";
-    position: absolute;
-    bottom: 30px;
-    left: 20px;
-    font-size: 1.3rem;
-    opacity: 0.4;
-}
-
-.hero-emoji {
-    font-size: 3rem;
-    margin-bottom: 0.5rem;
-    position: relative;
-    z-index: 1;
-}
-
-.hero-title {
-    font-size: 1.7rem;
-    font-weight: 900;
-    margin: 0.3rem 0;
-    color: white;
-    letter-spacing: -1px;
-    line-height: 1.2;
-    position: relative;
-    z-index: 1;
-}
-
-.hero-subtitle {
-    font-size: 1rem;
-    color: white;
-    opacity: 0.95;
-    margin: 0.4rem 0;
-    font-weight: 600;
-    position: relative;
-    z-index: 1;
-}
-
-.hero-phone {
-    display: inline-block;
-    background: rgba(255, 255, 255, 0.22);
-    padding: 0.4rem 1rem;
-    border-radius: 20px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    margin-top: 0.7rem;
-    position: relative;
-    z-index: 1;
-}
-
-.section-header {
-    font-size: 1.15rem;
-    font-weight: 800;
-    margin: 1.5rem 0 0.8rem;
-    padding-left: 0.6rem;
-    color: #1E40AF !important;
-    letter-spacing: -0.6px;
-    position: relative;
-}
-
-.section-header::before {
-    content: "";
-    position: absolute;
-    left: -4px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 5px;
-    height: 22px;
-    background: linear-gradient(180deg, #4285F4 0%, #1E40AF 100%);
-    border-radius: 5px;
-}
-
-[data-testid="stExpander"] {
-    background: white !important;
-    border: 2px solid #DBEAFE !important;
-    border-radius: 14px !important;
-    margin-bottom: 0.5rem !important;
-    box-shadow: 0 2px 8px rgba(66, 133, 244, 0.06) !important;
-    transition: all 0.2s;
-}
-
-[data-testid="stExpander"]:hover {
-    transform: translateY(-1px);
-    border-color: #93C5FD !important;
-    box-shadow: 0 4px 14px rgba(66, 133, 244, 0.15) !important;
-}
-
-[data-testid="stExpander"] summary {
-    padding: 0.7rem 1rem !important;
-    font-weight: 800 !important;
-    color: #1E3A8A !important;
-    font-size: 0.95rem !important;
-    letter-spacing: -0.4px;
-    list-style: none !important;
-    cursor: pointer;
-    position: relative;
-    display: flex !important;
-    align-items: center;
-    justify-content: space-between;
-}
-
-[data-testid="stExpander"] summary::-webkit-details-marker {
-    display: none !important;
-}
-
-[data-testid="stExpander"] summary::marker {
-    display: none !important;
-}
-
-[data-testid="stExpander"] summary::after {
-    content: "▼";
-    font-size: 0.7rem;
-    color: #4285F4;
-    transition: transform 0.25s ease;
-    margin-left: 0.5rem;
-    display: inline-block;
-    flex-shrink: 0;
-}
-
-[data-testid="stExpander"][open] summary::after {
-    transform: rotate(180deg);
-}
-
-[data-testid="stExpander"] summary p {
-    color: #1E3A8A !important;
-    font-weight: 800 !important;
-    margin: 0 !important;
-    flex: 1;
-}
-
-[data-testid="stExpander"] [data-testid="stMarkdownContainer"] p,
-[data-testid="stExpander"] [data-testid="stMarkdownContainer"] li,
-[data-testid="stExpander"] [data-testid="stMarkdownContainer"] span {
-    color: #1E293B !important;
-}
-
-.stButton > button {
-    border-radius: 14px !important;
-    font-weight: 700 !important;
-    border: 2px solid transparent !important;
-    transition: all 0.2s !important;
-    letter-spacing: -0.4px !important;
-    padding: 0.55rem 1rem !important;
-}
-
-.stButton > button[kind="primary"] {
-    background: linear-gradient(135deg, #4285F4 0%, #2563EB 100%) !important;
-    color: white !important;
-    box-shadow: 0 3px 10px rgba(66, 133, 244, 0.3) !important;
-}
-
-.stButton > button[kind="primary"]:hover {
-    background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%) !important;
-    transform: translateY(-2px);
-    box-shadow: 0 5px 16px rgba(66, 133, 244, 0.4) !important;
-}
-
-.stButton > button[kind="secondary"] {
-    background: white !important;
-    color: #1E40AF !important;
-    border: 2px solid #DBEAFE !important;
-}
-
-.stButton > button[kind="secondary"]:hover {
-    background: #EFF6FF !important;
-    border-color: #93C5FD !important;
-    color: #1D4ED8 !important;
-}
-
-.stLinkButton > a > button {
-    border-radius: 14px !important;
-    font-weight: 700 !important;
-    letter-spacing: -0.4px !important;
-}
-
-.stLinkButton > a > button[kind="primary"] {
-    background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
-    color: white !important;
-    border: none !important;
-    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3) !important;
-}
-
-.stTextInput > div > div > input,
-.stTextArea > div > div > textarea {
-    border-radius: 14px !important;
-    border: 2px solid #DBEAFE !important;
-    background: white !important;
-    color: #1E293B !important;
-    font-weight: 500 !important;
-}
-
-.cute-greeting {
-    background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
-    border-radius: 22px;
-    padding: 1.4rem 1rem;
-    text-align: center;
-    margin: 0.5rem 0;
-    border: 2px solid rgba(66, 133, 244, 0.15);
-}
-
-.cute-greeting-emoji {
-    font-size: 2.5rem;
-    margin-bottom: 0.4rem;
-}
-
-.cute-greeting-title {
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: #1E40AF !important;
-    letter-spacing: -0.5px;
-}
-
-.cute-greeting-sub {
-    font-size: 0.88rem;
-    color: #3B82F6 !important;
-    margin-top: 0.3rem;
-    font-weight: 600;
-}
-
-[data-testid="stChatMessage"] {
-    background: #F8FAFC !important;
-    border-radius: 16px !important;
-    padding: 0.8rem !important;
-}
-
-[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
-    color: #1E293B !important;
-}
-
-.footer {
-    text-align: center;
-    padding: 1.5rem 0 1rem;
-    color: #64748B !important;
-    font-size: 0.8rem;
-    font-weight: 500;
-}
-
-.stMarkdown p,
-.stMarkdown li,
-.stMarkdown span,
-[data-testid="stMarkdownContainer"] p,
-[data-testid="stMarkdownContainer"] li,
-[data-testid="stMarkdownContainer"] span {
-    color: #1E293B !important;
-}
-
-[data-testid="stCaptionContainer"] p,
-[data-testid="stCaptionContainer"] {
-    color: #475569 !important;
-}
-
-[data-testid="stAlert"] p,
-[data-testid="stAlert"] div {
-    color: #1E293B !important;
-}
-
-@media (max-width: 640px) {
-    .hero-emoji { font-size: 2.6rem; }
-    .hero-title { font-size: 1.5rem; }
-    .section-header { font-size: 1.05rem; }
-}
-
-@media (prefers-color-scheme: dark) {
-    .stApp {
-        background: white !important;
-    }
-    .block-container {
-        background: white !important;
-    }
-    [data-testid="stExpander"] {
-        background: white !important;
-    }
-    [data-testid="stExpander"] summary,
-    [data-testid="stExpander"] summary p {
-        color: #1E3A8A !important;
-    }
-    .stMarkdown p,
-    .stMarkdown li,
-    [data-testid="stMarkdownContainer"] p,
-    [data-testid="stMarkdownContainer"] li,
-    [data-testid="stMarkdownContainer"] span {
-        color: #1E293B !important;
-    }
-    .section-header {
-        color: #1E40AF !important;
-    }
-    .cute-greeting-title {
-        color: #1E40AF !important;
-    }
-    .cute-greeting-sub {
-        color: #3B82F6 !important;
-    }
-    [data-testid="stCaptionContainer"],
-    [data-testid="stCaptionContainer"] p {
-        color: #475569 !important;
-    }
-    [data-testid="stChatMessage"] {
-        background: #F8FAFC !important;
-    }
-    [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
-        color: #1E293B !important;
-    }
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea {
-        background: white !important;
-        color: #1E293B !important;
-    }
-    [data-testid="stAlert"] p,
-    [data-testid="stAlert"] div {
-        color: #1E293B !important;
-    }
-    .footer {
-        color: #64748B !important;
-    }
-}
-</style>
-"""
-
-st.html(CUSTOM_CSS)
-
-# 히어로 영역
-if hero_image:
-    st.image(hero_image, use_container_width=True)
-
-HERO_HTML = (
-    '<div class="hero-section">'
-    f'<div class="hero-emoji">{hero_emoji}</div>'
-    f'<div class="hero-title">{hero_title}</div>'
-    f'<div class="hero-subtitle">{hero_subtitle}</div>'
-    f'<div class="hero-phone">📞 {manager_name} · {manager_phone}</div>'
-    '</div>'
-)
-st.html(HERO_HTML)
-
-# 모집 공고 (드롭다운)
-st.html('<div class="section-header">📌 모집 중인 공고</div>')
-
-jobs = get_active_jobs_with_center()
-
-if not jobs:
-    st.info("현재 모집 중인 공고가 없습니다.")
-else:
-    for job in jobs:
-        status_emoji = "🟢" if job['status'] == '모집중' else ("🟡" if job['status'] == '재오픈예정' else "⚫")
-        
-        with st.expander(f"{status_emoji} **{job['title']}**", expanded=False):
-            detail_lines = []
-            if job.get('centers'):
-                detail_lines.append(f"🏢 **{job['centers']['name']}**")
-            if job.get('location'):
-                detail_lines.append(f"📍 {job.get('location')}")
-            if job.get('salary'):
-                detail_lines.append(f"💰 {job.get('salary')}")
-            if job.get('work_hours') or job.get('work_days'):
-                detail_lines.append(f"⏰ {job.get('work_hours', '')} · {job.get('work_days', '')}")
-            if job.get('education_period'):
-                detail_lines.append(f"📅 교육 {job['education_period']}")
-            if job.get('subway_station'):
-                detail_lines.append(f"🚇 {job.get('subway_line', '')} {job['subway_station']}")
-            elif job.get('centers') and job['centers'].get('subway_info'):
-                detail_lines.append(f"🚇 {job['centers']['subway_info']}")
-            if job.get('features'):
-                detail_lines.append(f"✨ {job['features']}")
-            
-            for line in detail_lines:
-                st.markdown(line)
-            
-            if job.get('description'):
-                st.markdown("---")
-                st.caption(job['description'])
-            
-            # 🌐 외부 채용 사이트 링크 (강조 박스)
-            ext_url = job.get('external_url')
-            ext_site = job.get('external_site_name') or '외부 사이트'
-            if ext_url:
-                EXT_LINK_HTML = (
-                    f'<a href="{ext_url}" target="_blank" style="text-decoration: none;">'
-                    '<div style="'
-                    'margin-top: 12px; '
-                    'padding: 12px 14px; '
-                    'background: linear-gradient(135deg, #FFF7ED 0%, #FED7AA 100%); '
-                    'border-radius: 12px; '
-                    'border-left: 4px solid #F97316; '
-                    'cursor: pointer; '
-                    'transition: transform 0.2s; '
-                    'box-shadow: 0 2px 6px rgba(249, 115, 22, 0.15);'
-                    '">'
-                    '<div style="'
-                    'font-size: 0.88rem; '
-                    'font-weight: 700; '
-                    'color: #9A3412; '
-                    'display: flex; '
-                    'align-items: center; '
-                    'justify-content: space-between;'
-                    '">'
-                    f'<span>📋 {ext_site}에서 자세한 공고 확인하러 가기</span>'
-                    '<span style="font-size: 1rem;">→</span>'
-                    '</div>'
-                    '</div>'
-                    '</a>'
-                )
-                st.html(EXT_LINK_HTML)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button("💬 이 공고 문의", key=f"chat_{job['id']}", use_container_width=True):
-                    st.session_state['preset_question'] = f"{job['title']} 공고에 대해 알려주세요"
-                    st.session_state['preset_job_id'] = job['id']
-                    st.session_state.active_tab = "chat"
-                    increment_job_view(job['id'], st.session_state.session_id)
-                    st.rerun()
-            with col2:
-                apply_url = job.get('google_form_url') or default_form_url
-                if apply_url:
-                    if st.button("📝 지원하기", key=f"apply_{job['id']}", use_container_width=True, type="primary"):
-                        increment_job_apply(job['id'], st.session_state.session_id)
-                        st.markdown(f'<meta http-equiv="refresh" content="0; url={apply_url}">', unsafe_allow_html=True)
-                        st.success("지원 페이지로 이동 중...")
-                        st.markdown(f"자동 이동 안 되면 [여기 클릭]({apply_url})")
-                else:
-                    st.button("📝 지원 준비중", key=f"apply_{job['id']}", use_container_width=True, disabled=True)
-
-# 기능 탭 선택 (4개)
-st.html('<div class="section-header">⚡ 기능 선택</div>')
-
-tab_cols = st.columns(4)
-
-with tab_cols[0]:
-    if st.button("💬 AI 상담", key="tab_chat", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "chat" else "secondary"):
-        st.session_state.active_tab = "chat"
-        st.rerun()
-
-with tab_cols[1]:
-    if default_form_url:
-        st.link_button("📝 간편지원", default_form_url, use_container_width=True, type="secondary")
-    else:
-        st.button("📝 간편지원", key="btn_apply_disabled", use_container_width=True, disabled=True)
-
-with tab_cols[2]:
-    if st.button("🚇 출근거리", key="tab_distance", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "distance" else "secondary"):
-        st.session_state.active_tab = "distance"
-        st.rerun()
-
-with tab_cols[3]:
-    if st.button("🙋 지원문의", key="tab_contact", use_container_width=True,
-                 type="primary" if st.session_state.active_tab == "contact" else "secondary"):
-        st.session_state.active_tab = "contact"
-        st.rerun()
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-# ============================================
-# 탭 1: AI 상담사
-# ============================================
-if st.session_state.active_tab == "chat":
-    
-    def build_system_prompt():
-        active_jobs_list = get_active_jobs()
-        kb = get_knowledge_base()
-        centers_list = get_active_centers()
-        
-        job_lines = []
-        for j in active_jobs_list:
-            job_lines.append(
-                f"[공고 {j['id']}] {j['title']}\n"
-                f"- 근무지: {j.get('location', '')}\n"
-                f"- 급여: {j.get('salary', '')}\n"
-                f"- 시간: {j.get('work_hours', '')} ({j.get('work_days', '')})\n"
-                f"- 교육: {j.get('education_period', '')}\n"
-                f"- 특징: {j.get('features', '')}\n"
-                f"- 설명: {j.get('description', '')}"
-            )
-        job_info = "\n\n".join(job_lines)
-        
-        kb_lines = [f"Q: {k.get('question', '')}\nA: {k.get('answer', '')}" for k in kb]
-        kb_info = "\n".join(kb_lines)
-        
-        center_info_lines = []
-        for c in centers_list:
-            ci = f"\n━━━━━ [{c['name']}] ━━━━━\n"
-            ci += f"주소: {c.get('address', '')}\n"
-            if c.get('detail_address'):
-                ci += f"상세: {c['detail_address']}\n"
-            if c.get('subway_info'):
-                ci += f"지하철: {c['subway_info']}\n"
-            if c.get('bus_info'):
-                ci += f"버스: {c['bus_info']}\n"
-            if c.get('parking_available'):
-                ci += "주차: 가능\n"
-            if c.get('info_note'):
-                ci += f"\n[센터 고유 정보]\n{c['info_note']}\n"
-            
-            try:
-                c_faqs = get_center_faqs(c['id'])
-                if c_faqs:
-                    ci += f"\n[{c['name']} 자주 묻는 질문]\n"
-                    for cf in c_faqs:
-                        ci += f"Q: {cf['question']}\nA: {cf['answer']}\n"
-            except Exception:
-                pass
-            
-            center_info_lines.append(ci)
-        
-        centers_text = "\n".join(center_info_lines)
-        
-        tone_guide = {
-            'friendly': '말투: 친근하고 따뜻하게. 공감 먼저, 정보 나중. 이모지 자연스럽게.',
-            'casual': '말투: 편하고 짧게.',
-            'formal': '말투: 정중하고 격식있게.'
-        }.get(tone, '친근한 말투')
-        
-        return (
-            f"당신은 윌앤비전 채용팀 AI 상담사 '{bot_name}'입니다.\n"
-            f"{tone_guide}\n\n"
-            f"[모집 공고]\n{job_info}\n\n"
-            f"[공통 FAQ]\n{kb_info}\n\n"
-            f"[센터 정보]\n{centers_text}\n\n"
-            f"[담당자]\n- {manager_name} / {manager_phone}\n\n"
-            f"[규칙]\n"
-            f"1. 위 정보 안에서만 답변\n"
-            f"2. 답변 끝에 '더 궁금한 점 있으세요? 😊'\n"
-            f"3. 센터 관련 질문 → 해당 센터 정보 정확히 답변\n"
-            f"4. 지원 의사 보이면 지원서 안내\n"
-            f"5. 공고 밖 질문은 담당자 연결 안내\n"
-            f"6. 짧고 모바일 친화적으로\n"
-            f"7. 개인정보 수집 금지"
-        )
-    
-    GREETING_HTML = (
-        '<div class="cute-greeting">'
-        f'<div class="cute-greeting-emoji">{bot_emoji}</div>'
-        f'<div class="cute-greeting-title">{bot_greeting}</div>'
-        f'<div class="cute-greeting-sub">{bot_sub}</div>'
-        '</div>'
-    )
-    st.html(GREETING_HTML)
-    
-    if not st.session_state.messages:
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.caption("🔥 이런 걸 많이 물어봐요")
-        sug_col1, sug_col2 = st.columns(2)
-        suggested_questions = [
-            settings.get('suggested_q_1', '신입도 가능해요?'),
-            settings.get('suggested_q_2', '나에게 맞는 채용은?'),
-            settings.get('suggested_q_3', '급여 얼마에요?'),
-            settings.get('suggested_q_4', '교육 기간은?'),
-        ]
-        for idx, q in enumerate(suggested_questions):
-            with sug_col1 if idx % 2 == 0 else sug_col2:
-                if st.button(q, key=f"sug_{idx}", use_container_width=True):
-                    st.session_state.preset_question = q
-                    st.rerun()
-    
-    chat_container = st.container(border=True, height=250)
-    with chat_container:
-        if not st.session_state.messages:
-            st.caption(bot_empty)
-        for msg in st.session_state.messages:
-            avatar = bot_emoji if msg["role"] == "assistant" else None
-            with st.chat_message(msg["role"], avatar=avatar):
-                st.markdown(msg["content"])
-    
-    preset = st.session_state.pop("preset_question", None)
-    user_input = preset or st.chat_input(bot_placeholder)
-    
-    if user_input:
-        st.session_state.messages.append({"role": "user", "content": user_input})
-        
-        try:
-            system_prompt = build_system_prompt()
-            chat_history = [{"role": "system", "content": system_prompt}]
-            chat_history.extend(st.session_state.messages[-8:])
-            
-            with st.spinner(bot_thinking):
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=chat_history,
-                    temperature=0.7,
-                    max_tokens=500,
-                )
-            
-            answer = response.choices[0].message.content
-            st.session_state.messages.append({"role": "assistant", "content": answer})
-            
-            needs_human = "담당자" in answer or manager_phone in answer
-            save_conversation(
-                session_id=st.session_state.session_id,
-                question=user_input,
-                answer=answer,
-                related_job_id=st.session_state.get('preset_job_id'),
-                needs_human=needs_human,
-            )
-            st.rerun()
-        except Exception as e:
-            st.error(f"오류 발생. {manager_phone}로 문의해주세요.")
-            st.caption(f"에러: {str(e)[:100]}")
-    
-    if st.session_state.messages:
-        col1, col2 = st.columns(2)
-        with col1:
-            if default_form_url:
-                st.link_button("📝 지원하기", default_form_url, use_container_width=True, type="primary")
-        with col2:
-            if st.button("🔄 새 대화", use_container_width=True):
-                st.session_state.messages = []
-                st.rerun()
+st.set_page_config(page_title="관리자", page_icon="🔐", layout="wide")
 
 
-# ============================================
-# 탭 2: 출근 거리
-# ============================================
-elif st.session_state.active_tab == "distance":
-    st.markdown("#### 🚇 출근 경로 확인")
-    st.caption("집 주소 / 역 이름을 입력하세요")
-    
-    start_address = st.text_input(
-        "출발지",
-        placeholder="예: 강남역, 서울역, 홍대입구역",
-        label_visibility="collapsed",
-        key="start_addr"
-    )
-    
-    quick_cols = st.columns(4)
-    quick_stations = ["강남역", "홍대입구역", "서울역", "잠실역"]
-    for idx, loc in enumerate(quick_stations):
-        with quick_cols[idx]:
-            if st.button(loc, key=f"qa_{idx}", use_container_width=True):
-                st.session_state['start_addr'] = loc
-                st.rerun()
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
-    centers = get_active_centers()
-    if not centers:
-        st.warning("등록된 센터가 없어요. 관리자 페이지에서 추가해주세요.")
-    else:
-        if len(centers) == 1:
-            selected_center = centers[0]
-            st.info(f"🏢 **{selected_center['name']}** — {selected_center['address']}")
+def check_password():
+    def password_entered():
+        if st.session_state["password"] == st.secrets["ADMIN_PASSWORD"]:
+            st.session_state["authenticated"] = True
+            del st.session_state["password"]
         else:
-            c_opts = {c['id']: c['name'] for c in centers}
-            sel_id = st.radio(
-                "도착지 센터",
-                options=list(c_opts.keys()),
-                format_func=lambda x: f"🏢 {c_opts[x]}",
-                horizontal=True,
-                key="dest_center"
-            )
-            selected_center = next(c for c in centers if c['id'] == sel_id)
-        
-        st.markdown("**🚏 교통수단**")
-        t_cols = st.columns(4)
-        transport_labels = [
-            ("publictransit", "🚇 대중"),
-            ("car", "🚗 자동차"),
-            ("foot", "🚶 도보"),
-            ("bicycle", "🚴 자전거"),
-        ]
-        sel_transport = st.session_state.get('sel_transport', 'publictransit')
-        for idx, (key, label) in enumerate(transport_labels):
-            with t_cols[idx]:
-                is_active = (key == sel_transport)
-                if st.button(label, key=f"tr_{key}", use_container_width=True,
-                             type="primary" if is_active else "secondary"):
-                    st.session_state['sel_transport'] = key
-                    st.rerun()
-        
-        if start_address:
-            st.markdown("<br>", unsafe_allow_html=True)
-            start_enc = urllib.parse.quote(start_address)
-            end_enc = urllib.parse.quote(selected_center['address'])
-            kakao_url = f"https://map.kakao.com/?sName={start_enc}&eName={end_enc}"
-            
-            naver_map = {
-                "publictransit": "transit",
-                "car": "car",
-                "foot": "walk",
-                "bicycle": "bicycle"
-            }
-            naver_mode = naver_map.get(sel_transport, "transit")
-            naver_url = f"https://map.naver.com/p/directions/-/{end_enc}/{naver_mode}"
-            
-            RESULT_HTML = (
-                '<div style="background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); '
-                'padding: 1.2rem; border-radius: 16px; text-align: center; margin: 0.5rem 0; '
-                'border: 2px solid rgba(66, 133, 244, 0.15);">'
-                f'<div style="font-size: 0.9rem; color: #1E40AF; font-weight: 600;">🏠 {start_address}</div>'
-                '<div style="margin: 0.3rem 0; color: #4285F4;">⬇️</div>'
-                f'<div style="font-weight: 700; color: #1E3A8A; font-size: 1rem;">🏢 {selected_center["name"]}</div>'
-                '</div>'
-            )
-            st.html(RESULT_HTML)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.link_button("🗺️ 카카오맵", kakao_url, type="primary", use_container_width=True)
-            with col2:
-                st.link_button("🗺️ 네이버지도", naver_url, use_container_width=True)
-            
-            st.caption("💡 버튼을 누르면 정확한 예상 시간·거리·비용이 표시됩니다.")
-        else:
-            st.caption("👆 출발지를 입력하거나 선택해주세요.")
+            st.session_state["authenticated"] = False
+
+    if "authenticated" not in st.session_state:
+        st.session_state["authenticated"] = False
+
+    if not st.session_state["authenticated"]:
+        st.title("🔐 관리자 로그인")
+        st.text_input("비밀번호", type="password", on_change=password_entered, key="password")
+        if "password" in st.session_state:
+            st.error("비밀번호가 올바르지 않습니다.")
+        st.stop()
 
 
-# ============================================
-# 탭 3: 지원 문의
-# ============================================
-elif st.session_state.active_tab == "contact":
-    st.markdown("#### 🙋 지원 문의")
-    st.caption(f"{manager_name}님께 직접 문의하세요!")
+check_password()
+
+st.title("🔐 윌앤비전 채용 관리자")
+st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "📊 대시보드",
+    "📋 공고 관리",
+    "🏢 센터 관리",
+    "❓ FAQ 관리",
+    "⚙️ 사이트 설정",
+    "💬 대화 기록"
+])
+
+# =============================================================
+# TAB 1: 대시보드
+# =============================================================
+with tab1:
+    st.subheader("📊 전체 통계")
+    
+    stats = get_stats()
+    
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🟢 모집중 공고", stats['jobs_active'], f"전체 {stats['jobs_total']}개")
+    col2.metric("💬 누적 대화", f"{stats['total_conversations']:,}")
+    col3.metric("👥 순 방문자", f"{stats['unique_visitors']:,}")
+    
+    st.divider()
+    
+    st.subheader("🏆 공고별 통계")
+    st.caption("각 공고가 얼마나 관심받았는지, 실제 지원까지 이어졌는지 확인")
+    
+    all_jobs_stats = get_all_jobs()
+    if all_jobs_stats:
+        stats_data = []
+        for job in all_jobs_stats:
+            view_count = job.get('view_count') or 0
+            apply_count = job.get('apply_count') or 0
+            conversion = (apply_count / view_count * 100) if view_count > 0 else 0
+            stats_data.append({
+                "공고": job['title'][:30] + ('...' if len(job['title']) > 30 else ''),
+                "상태": job['status'],
+                "💬 문의 클릭": view_count,
+                "📝 지원 클릭": apply_count,
+                "🎯 전환율": f"{conversion:.1f}%"
+            })
+        
+        df_stats = pd.DataFrame(stats_data)
+        df_stats = df_stats.sort_values("💬 문의 클릭", ascending=False)
+        st.dataframe(df_stats, use_container_width=True, hide_index=True)
+        st.caption("💡 전환율 = 지원 클릭 ÷ 문의 클릭 × 100")
+    
+    st.divider()
     
     col1, col2 = st.columns(2)
     
     with col1:
-        KAKAO_CARD = (
-            '<div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); '
-            'padding: 1.3rem; border-radius: 16px; text-align: center; '
-            'border: 2px solid rgba(251, 191, 36, 0.3);">'
-            '<div style="font-size: 2.5rem;">💬</div>'
-            '<div style="font-weight: 700; margin-top: 0.3rem; color: #92400E;">카카오톡</div>'
-            '<div style="font-size: 0.75rem; color: #B45309; font-weight: 500;">빠른 답변</div>'
-            '</div>'
-        )
-        st.html(KAKAO_CARD)
-        if openchat_url:
-            st.link_button("오픈채팅 →", openchat_url, type="primary", use_container_width=True)
+        st.subheader("🔥 인기 공고 TOP 5")
+        popular = get_popular_jobs(5)
+        if popular:
+            for i, job in enumerate(popular, 1):
+                view_count = job.get('view_count', 0)
+                apply_count = job.get('apply_count', 0)
+                st.markdown(f"**{i}.** {job['title']}")
+                st.caption(f"💬 문의 {view_count}회 · 📝 지원 {apply_count}회 · {job['status']}")
         else:
-            st.button("준비중", disabled=True, use_container_width=True, key="kakao_disabled")
+            st.info("아직 데이터가 없습니다.")
     
     with col2:
-        PHONE_CARD = (
-            '<div style="background: linear-gradient(135deg, #DBEAFE 0%, #BFDBFE 100%); '
-            'padding: 1.3rem; border-radius: 16px; text-align: center; '
-            'border: 2px solid rgba(66, 133, 244, 0.2);">'
-            '<div style="font-size: 2.5rem;">📞</div>'
-            '<div style="font-weight: 700; margin-top: 0.3rem; color: #1E40AF;">전화</div>'
-            '<div style="font-size: 0.75rem; color: #2563EB; font-weight: 500;">즉시 상담</div>'
-            '</div>'
-        )
-        st.html(PHONE_CARD)
-        phone_clean = manager_phone.replace('-', '')
-        st.link_button(f"{manager_phone}", f"tel:{phone_clean}", use_container_width=True)
+        st.subheader("⚠️ 담당자 연결 필요")
+        st.metric("담당자 연결 요청", f"{stats['needs_human_count']:,}건")
+        st.caption("AI가 답변 못한 질문들. 💬 대화기록 탭에서 확인하세요.")
 
-# FAQ
-faqs = get_faq_items()
-if faqs:
-    st.html('<div class="section-header">💡 자주 묻는 질문</div>')
-    for faq in faqs[:5]:
-        with st.expander(f"❓ {faq.get('question', '')}"):
-            st.write(faq.get('answer', ''))
-
-# 주의사항 박스
-notice_text = settings.get('notice_text', '')
-if notice_text:
-    formatted_notice = notice_text.replace('※ ', '<br>※ ').replace('• ', '<br>• ').strip()
-    if formatted_notice.startswith('<br>'):
-        formatted_notice = formatted_notice[4:]
+# =============================================================
+# TAB 2: 공고 관리 (이미지 업로드 제거 + 외부 채용 사이트 추가)
+# =============================================================
+with tab2:
+    st.subheader("📋 공고 관리")
     
-    NOTICE_HTML = (
-        '<div style="'
-        'background: transparent; '
-        'border-top: 1px solid #F1F5F9; '
-        'padding: 1rem 0.5rem 0.5rem; '
-        'margin: 1.5rem 0 0.5rem; '
-        'color: #94A3B8; '
-        'font-size: 0.7rem; '
-        'line-height: 1.6; '
-        'font-weight: 400;'
-        '">'
-        '<div style="'
-        'font-weight: 600; '
-        'font-size: 0.72rem; '
-        'color: #94A3B8; '
-        'margin-bottom: 0.5rem;'
-        '">'
-        '채용 안내'
-        '</div>'
-        f'<div style="color: #94A3B8;">{formatted_notice}</div>'
-        '</div>'
-    )
-    st.html(NOTICE_HTML)
+    # ============ 새 공고 추가 ============
+    with st.expander("➕ 새 공고 추가하기"):
+        
+        active_centers = get_active_centers()
+        if active_centers:
+            center_options = {c['id']: c['name'] for c in active_centers}
+            new_center_id = st.selectbox(
+                "🏢 근무 센터 선택 *",
+                options=list(center_options.keys()),
+                format_func=lambda x: center_options[x],
+                key="new_job_center_select",
+                help="등록된 센터에서 선택. 선택하면 주소/지하철 정보가 자동으로 채워집니다."
+            )
+            
+            selected_center = next((c for c in active_centers if c['id'] == new_center_id), None)
+            if selected_center:
+                info_text = f"**{selected_center['name']}**\n\n"
+                info_text += f"📍 주소: {selected_center.get('address', '')}\n\n"
+                if selected_center.get('subway_info'):
+                    info_text += f"🚇 지하철: {selected_center.get('subway_info', '')}\n\n"
+                if selected_center.get('phone'):
+                    info_text += f"📞 연락처: {selected_center.get('phone', '')}"
+                st.info(info_text)
+        else:
+            new_center_id = None
+            selected_center = None
+            st.warning("⚠️ 등록된 센터가 없습니다. '🏢 센터 관리' 탭에서 먼저 센터를 추가해주세요.")
+        
+        with st.form("new_job_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            new_title = col1.text_input("직군명 *", placeholder="예: 인바운드 상담원")
+            new_category = col2.selectbox("카테고리", ["IB상담", "OB상담", "채팅상담", "사무직", "기타"])
+            
+            default_subway_line = ""
+            default_subway_station = ""
+            default_location = ""
+            
+            if selected_center:
+                subway_info = selected_center.get('subway_info', '') or ""
+                if '호선' in subway_info:
+                    parts = subway_info.split(' ', 1)
+                    if len(parts) >= 1:
+                        default_subway_line = parts[0]
+                    if len(parts) >= 2:
+                        rest = parts[1]
+                        if '역' in rest:
+                            default_subway_station = rest.split('역')[0] + '역'
+                
+                default_location = f"{default_subway_station} 인근" if default_subway_station else selected_center.get('address', '')[:20]
+            
+            st.caption("💡 센터 기반으로 자동 채워졌습니다. 필요시 수정하세요.")
+            
+            col1, col2, col3 = st.columns(3)
+            new_subway_line = col1.text_input("지하철 노선", value=default_subway_line, placeholder="예: 2호선")
+            new_subway_station = col2.text_input("지하철역", value=default_subway_station, placeholder="예: 문래역")
+            new_location = col3.text_input("근무지 상세", value=default_location, placeholder="예: 문래역 인근")
+            
+            col1, col2 = st.columns(2)
+            new_salary = col1.text_input("급여 *", placeholder="예: 월 250만원")
+            new_hours = col2.text_input("근무시간", placeholder="예: 09-18시")
+            
+            col1, col2 = st.columns(2)
+            new_days = col1.text_input("근무요일", placeholder="예: 월-금 (주5일)")
+            new_education = col2.text_input("교육 일정", placeholder="예: 5/1부터 3일간")
+            
+            new_features = st.text_input("특징", placeholder="예: 신입가능, 주말휴무")
+            new_description = st.text_area("상세 설명", placeholder="업무 내용 등")
+            
+            col1, col2 = st.columns(2)
+            new_form_url = col1.text_input("구글폼 URL", placeholder="https://forms.gle/...")
+            new_chat_url = col2.text_input("오픈채팅 URL", placeholder="https://open.kakao.com/...")
+            
+            # 🌐 외부 채용 사이트
+            st.markdown("**🌐 외부 채용 사이트 (선택)**")
+            st.caption("알바몬, 잡코리아 등에 공고 올린 경우 링크 추가 (공고 카드 하단에 강조 표시됩니다)")
+            col1, col2 = st.columns([1, 2])
+            new_external_site = col1.text_input("사이트명", placeholder="예: 알바몬")
+            new_external_url = col2.text_input("URL", placeholder="https://www.albamon.com/...")
+            
+            new_status = st.selectbox("상태", ["모집중", "마감", "재오픈예정"])
+            new_order = st.number_input("표시 순서 (작을수록 위)", min_value=0, value=99)
+            
+            submitted = st.form_submit_button("💾 공고 등록", type="primary", use_container_width=True)
+            
+            if submitted:
+                if not new_title or not new_salary:
+                    st.error("직군명과 급여는 필수입니다.")
+                elif not new_center_id:
+                    st.error("근무 센터를 선택해주세요.")
+                else:
+                    data = {
+                        "title": new_title,
+                        "category": new_category,
+                        "center_id": new_center_id,
+                        "subway_line": new_subway_line,
+                        "subway_station": new_subway_station,
+                        "location": new_location or (f"{new_subway_station} 인근" if new_subway_station else ""),
+                        "salary": new_salary,
+                        "work_hours": new_hours,
+                        "work_days": new_days,
+                        "education_period": new_education,
+                        "features": new_features,
+                        "description": new_description,
+                        "google_form_url": new_form_url,
+                        "open_chat_url": new_chat_url,
+                        "external_url": new_external_url,
+                        "external_site_name": new_external_site,
+                        "status": new_status,
+                        "display_order": new_order,
+                    }
+                    try:
+                        create_job(data)
+                        st.success("✅ 공고가 등록되었습니다!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"등록 실패: {e}")
+    
+    st.divider()
+    
+    # ============ 등록된 공고 목록 ============
+    st.markdown("### 📋 등록된 공고 목록")
+    jobs = get_all_jobs()
+    
+    if not jobs:
+        st.info("등록된 공고가 없습니다.")
+    else:
+        for job in jobs:
+            with st.expander(f"**{job['title']}** — {job['status']}", expanded=False):
+                
+                with st.form(f"edit_job_{job['id']}"):
+                    col1, col2 = st.columns(2)
+                    ed_title = col1.text_input("직군명", value=job['title'] or "", key=f"job_title_{job['id']}")
+                    ed_category = col2.selectbox(
+                        "카테고리",
+                        ["IB상담", "OB상담", "채팅상담", "사무직", "기타"],
+                        index=["IB상담", "OB상담", "채팅상담", "사무직", "기타"].index(job['category']) if job.get('category') in ["IB상담", "OB상담", "채팅상담", "사무직", "기타"] else 0,
+                        key=f"job_cat_{job['id']}"
+                    )
+                    
+                    active_centers_list = get_active_centers()
+                    if active_centers_list:
+                        center_opts = {c['id']: c['name'] for c in active_centers_list}
+                        current_center_id = job.get('center_id')
+                        current_idx = 0
+                        if current_center_id in center_opts:
+                            current_idx = list(center_opts.keys()).index(current_center_id)
+                        ed_center_id = st.selectbox(
+                            "🏢 근무 센터",
+                            options=list(center_opts.keys()),
+                            format_func=lambda x: center_opts[x],
+                            index=current_idx,
+                            key=f"job_center_{job['id']}",
+                        )
+                    else:
+                        ed_center_id = job.get('center_id')
+                    
+                    col1, col2, col3 = st.columns(3)
+                    ed_subway_line = col1.text_input("노선", value=job.get('subway_line') or "", key=f"job_line_{job['id']}")
+                    ed_subway_station = col2.text_input("역", value=job.get('subway_station') or "", key=f"job_stn_{job['id']}")
+                    ed_location = col3.text_input("근무지", value=job.get('location') or "", key=f"job_loc_{job['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    ed_salary = col1.text_input("급여", value=job.get('salary') or "", key=f"job_sal_{job['id']}")
+                    ed_hours = col2.text_input("근무시간", value=job.get('work_hours') or "", key=f"job_hrs_{job['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    ed_days = col1.text_input("근무요일", value=job.get('work_days') or "", key=f"job_days_{job['id']}")
+                    ed_education = col2.text_input("교육", value=job.get('education_period') or "", key=f"job_edu_{job['id']}")
+                    
+                    ed_features = st.text_input("특징", value=job.get('features') or "", key=f"job_feat_{job['id']}")
+                    ed_description = st.text_area("설명", value=job.get('description') or "", key=f"job_desc_{job['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    ed_form_url = col1.text_input("구글폼 URL", value=job.get('google_form_url') or "", key=f"job_form_{job['id']}")
+                    ed_chat_url = col2.text_input("오픈채팅 URL", value=job.get('open_chat_url') or "", key=f"job_chat_{job['id']}")
+                    
+                    # 🌐 외부 채용 사이트
+                    st.markdown("**🌐 외부 채용 사이트 (선택)**")
+                    col1, col2 = st.columns([1, 2])
+                    ed_external_site = col1.text_input(
+                        "사이트명", 
+                        value=job.get('external_site_name') or "",
+                        placeholder="예: 알바몬",
+                        key=f"job_ext_site_{job['id']}"
+                    )
+                    ed_external_url = col2.text_input(
+                        "URL", 
+                        value=job.get('external_url') or "",
+                        placeholder="https://...",
+                        key=f"job_ext_url_{job['id']}"
+                    )
+                    
+                    col1, col2 = st.columns(2)
+                    ed_status = col1.selectbox(
+                        "상태",
+                        ["모집중", "마감", "재오픈예정"],
+                        index=["모집중", "마감", "재오픈예정"].index(job['status']),
+                        key=f"job_status_{job['id']}"
+                    )
+                    ed_order = col2.number_input("순서", min_value=0, value=job.get('display_order') or 0, key=f"job_order_{job['id']}")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    save_btn = col1.form_submit_button("💾 저장", type="primary", use_container_width=True)
+                    delete_btn = col3.form_submit_button("🗑️ 삭제", use_container_width=True)
+                    
+                    if save_btn:
+                        data = {
+                            "title": ed_title,
+                            "category": ed_category,
+                            "center_id": ed_center_id,
+                            "subway_line": ed_subway_line,
+                            "subway_station": ed_subway_station,
+                            "location": ed_location,
+                            "salary": ed_salary,
+                            "work_hours": ed_hours,
+                            "work_days": ed_days,
+                            "education_period": ed_education,
+                            "features": ed_features,
+                            "description": ed_description,
+                            "google_form_url": ed_form_url,
+                            "open_chat_url": ed_chat_url,
+                            "external_url": ed_external_url,
+                            "external_site_name": ed_external_site,
+                            "status": ed_status,
+                            "display_order": ed_order,
+                        }
+                        try:
+                            update_job(job['id'], data)
+                            st.success("✅ 수정 완료!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"수정 실패: {e}")
+                    
+                    if delete_btn:
+                        try:
+                            delete_job(job['id'])
+                            st.success("🗑️ 삭제됨")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"삭제 실패: {e}")
 
-# 푸터
-FOOTER_HTML = (
-    '<div class="footer">'
-    '💬 궁금한 점은 AI 상담사가 24시간 답변해드립니다<br>'
-    f'📞 {manager_name} · {manager_phone}<br>'
-    '<br>'
-    '© 윌앤비전 채용팀'
-    '</div>'
-)
-st.html(FOOTER_HTML)
+# =============================================================
+# TAB 3: 센터 관리
+# =============================================================
+with tab3:
+    st.subheader("🏢 센터 관리")
+    st.caption("근무지(센터) 정보를 관리하고, 센터별 FAQ를 등록하세요.")
+    
+    with st.expander("➕ 새 센터 추가"):
+        with st.form("new_center_form", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            nc_name = col1.text_input("센터 이름 *", placeholder="예: 윌앤비전 강남센터")
+            nc_phone = col2.text_input("대표 연락처", placeholder="02-XXX-XXXX")
+            
+            nc_address = st.text_input("주소 *", placeholder="예: 서울특별시 강남구 테헤란로 123")
+            nc_detail = st.text_input("상세 안내", placeholder="예: XX빌딩 5층, 역에서 도보 3분")
+            
+            col1, col2 = st.columns(2)
+            nc_subway = col1.text_input("지하철 정보", placeholder="예: 2호선 강남역 3번 출구")
+            nc_bus = col2.text_input("버스 정보", placeholder="예: 강남역 정류장")
+            
+            nc_desc = st.text_area("센터 설명", placeholder="이 센터에서 운영하는 업무 등")
+            
+            nc_info_note = st.text_area(
+                "📝 센터 고유 정보 (AI 챗봇 참조용)",
+                placeholder="휴게실 위치, 주차 정보, 분위기, 복리후생 등",
+                height=120,
+            )
+            
+            col1, col2 = st.columns(2)
+            nc_parking = col1.checkbox("🚗 주차 가능")
+            nc_active = col2.checkbox("✅ 활성화", value=True)
+            
+            nc_order = st.number_input("표시 순서 (작을수록 위)", min_value=0, value=99)
+            
+            submitted = st.form_submit_button("💾 센터 등록", type="primary", use_container_width=True)
+            if submitted:
+                if not nc_name or not nc_address:
+                    st.error("센터 이름과 주소는 필수입니다.")
+                else:
+                    try:
+                        create_center({
+                            "name": nc_name,
+                            "address": nc_address,
+                            "detail_address": nc_detail,
+                            "phone": nc_phone,
+                            "subway_info": nc_subway,
+                            "bus_info": nc_bus,
+                            "description": nc_desc,
+                            "info_note": nc_info_note,
+                            "parking_available": nc_parking,
+                            "is_active": nc_active,
+                            "display_order": nc_order,
+                        })
+                        st.success("✅ 센터가 등록되었습니다!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"등록 실패: {e}")
+    
+    st.divider()
+    
+    st.markdown("### 📋 등록된 센터")
+    centers = get_all_centers()
+    
+    if not centers:
+        st.info("등록된 센터가 없습니다. 위에서 추가해주세요.")
+    else:
+        for c in centers:
+            status_badge = "🟢 활성" if c.get('is_active') else "⚫ 비활성"
+            with st.expander(f"**{c['name']}** — {status_badge}", expanded=False):
+                
+                with st.form(f"edit_center_{c['id']}"):
+                    col1, col2 = st.columns(2)
+                    ec_name = col1.text_input("이름", value=c['name'], key=f"ctr_name_{c['id']}")
+                    ec_phone = col2.text_input("연락처", value=c.get('phone') or "", key=f"ctr_phone_{c['id']}")
+                    
+                    ec_address = st.text_input("주소", value=c['address'], key=f"ctr_addr_{c['id']}")
+                    ec_detail = st.text_input("상세 안내", value=c.get('detail_address') or "", key=f"ctr_detail_{c['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    ec_subway = col1.text_input("지하철", value=c.get('subway_info') or "", key=f"ctr_subway_{c['id']}")
+                    ec_bus = col2.text_input("버스", value=c.get('bus_info') or "", key=f"ctr_bus_{c['id']}")
+                    
+                    ec_desc = st.text_area("설명", value=c.get('description') or "", key=f"ctr_desc_{c['id']}")
+                    
+                    ec_info_note = st.text_area(
+                        "📝 센터 고유 정보 (AI 챗봇 참조용)",
+                        value=c.get('info_note') or "",
+                        placeholder="""예:
+- 위치: 문래역 5번 출구 도보 3분
+- 휴게실: 3층 (자판기, 전자레인지)
+- 주차: 건물 뒤 3대 (선착순)
+- 분위기: 편안하고 수평적, 평균 30대
+- 점심: 1층 구내식당 or 근처 맛집
+- 복리후생: 월 교통비 지원, 간식 무한""",
+                        height=180,
+                        help="💡 이 내용을 바탕으로 AI 챗봇이 센터 관련 질문에 답변합니다",
+                        key=f"ctr_info_{c['id']}"
+                    )
+                    
+                    col1, col2, col3 = st.columns(3)
+                    ec_parking = col1.checkbox("🚗 주차 가능", value=c.get('parking_available', False), key=f"ctr_parking_{c['id']}")
+                    ec_active = col2.checkbox("✅ 활성화", value=c.get('is_active', True), key=f"ctr_active_{c['id']}")
+                    ec_order = col3.number_input("순서", min_value=0, value=c.get('display_order') or 0, key=f"ctr_order_{c['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    save_btn = col1.form_submit_button("💾 저장", type="primary", use_container_width=True)
+                    delete_btn = col2.form_submit_button("🗑️ 삭제", use_container_width=True)
+                    
+                    if save_btn:
+                        try:
+                            update_center(c['id'], {
+                                "name": ec_name,
+                                "address": ec_address,
+                                "detail_address": ec_detail,
+                                "phone": ec_phone,
+                                "subway_info": ec_subway,
+                                "bus_info": ec_bus,
+                                "description": ec_desc,
+                                "info_note": ec_info_note,
+                                "parking_available": ec_parking,
+                                "is_active": ec_active,
+                                "display_order": ec_order,
+                            })
+                            st.success("✅ 수정 완료!")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"실패: {e}")
+                    
+                    if delete_btn:
+                        try:
+                            delete_center(c['id'])
+                            st.success("🗑️ 삭제됨")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"실패: {e}. 이 센터에 연결된 공고가 있을 수 있어요.")
+                
+                # ============ 센터별 FAQ ============
+                st.markdown("---")
+                st.markdown(f"#### ❓ {c['name']} 전용 FAQ")
+                st.caption("이 센터에만 해당하는 질문-답변을 등록하세요")
+                
+                with st.expander("➕ FAQ 추가"):
+                    with st.form(f"new_cfaq_{c['id']}", clear_on_submit=True):
+                        cfaq_q = st.text_input("질문", placeholder="예: 주차 가능해요?", key=f"ncf_q_{c['id']}")
+                        cfaq_a = st.text_area("답변", placeholder="예: 건물 뒤쪽에 3대 가능합니다", key=f"ncf_a_{c['id']}")
+                        cfaq_order = st.number_input("표시 순서", min_value=0, value=99, key=f"ncf_ord_{c['id']}")
+                        
+                        if st.form_submit_button("💾 등록", type="primary", use_container_width=True):
+                            if cfaq_q and cfaq_a:
+                                try:
+                                    create_center_faq({
+                                        "center_id": c['id'],
+                                        "question": cfaq_q,
+                                        "answer": cfaq_a,
+                                        "display_order": cfaq_order,
+                                        "is_active": True,
+                                    })
+                                    st.success("✅ FAQ 등록!")
+                                    st.rerun()
+                                except Exception as e:
+                                    st.error(f"실패: {e}")
+                            else:
+                                st.error("질문과 답변을 입력해주세요.")
+                
+                center_faqs_list = get_all_center_faqs(c['id'])
+                if center_faqs_list:
+                    for cfaq in center_faqs_list:
+                        active_badge = "🟢" if cfaq.get('is_active') else "⚫"
+                        with st.container(border=True):
+                            st.markdown(f"{active_badge} **Q:** {cfaq['question']}")
+                            st.caption(f"**A:** {cfaq['answer']}")
+                            
+                            col1, col2, col3 = st.columns([1, 1, 4])
+                            with col1:
+                                if st.button("✏️ 수정", key=f"cf_edit_{cfaq['id']}"):
+                                    st.session_state[f"edit_cfaq_{cfaq['id']}"] = True
+                                    st.rerun()
+                            with col2:
+                                if st.button("🗑️", key=f"cf_del_{cfaq['id']}"):
+                                    delete_center_faq(cfaq['id'])
+                                    st.success("삭제됨")
+                                    st.rerun()
+                            
+                            if st.session_state.get(f"edit_cfaq_{cfaq['id']}"):
+                                with st.form(f"edit_cfaq_form_{cfaq['id']}"):
+                                    new_q = st.text_input("질문", value=cfaq['question'], key=f"ecf_q_{cfaq['id']}")
+                                    new_a = st.text_area("답변", value=cfaq['answer'], key=f"ecf_a_{cfaq['id']}")
+                                    new_order = st.number_input("순서", value=cfaq.get('display_order', 0), key=f"ecf_ord_{cfaq['id']}")
+                                    new_active = st.checkbox("활성화", value=cfaq.get('is_active', True), key=f"ecf_act_{cfaq['id']}")
+                                    
+                                    sc1, sc2 = st.columns(2)
+                                    if sc1.form_submit_button("💾 저장", type="primary", use_container_width=True):
+                                        update_center_faq(cfaq['id'], {
+                                            "question": new_q,
+                                            "answer": new_a,
+                                            "display_order": new_order,
+                                            "is_active": new_active,
+                                        })
+                                        st.session_state[f"edit_cfaq_{cfaq['id']}"] = False
+                                        st.success("저장됨!")
+                                        st.rerun()
+                                    if sc2.form_submit_button("취소", use_container_width=True):
+                                        st.session_state[f"edit_cfaq_{cfaq['id']}"] = False
+                                        st.rerun()
+                else:
+                    st.caption("💡 등록된 FAQ가 없습니다. 위에서 추가해보세요.")
+
+# =============================================================
+# TAB 4: FAQ 관리 (공통)
+# =============================================================
+with tab4:
+    st.subheader("❓ 공통 FAQ 관리")
+    st.caption("모든 센터에 해당하는 공통 질문-답변을 관리하세요. 센터별 FAQ는 '🏢 센터 관리'에서!")
+    
+    with st.expander("➕ 새 FAQ 추가"):
+        with st.form("new_faq_form", clear_on_submit=True):
+            col1, col2 = st.columns([1, 2])
+            new_category = col1.selectbox("카테고리", ["회사소개", "담당자", "지원방법", "근무조건", "기타"])
+            new_order = col2.number_input("표시 순서", min_value=0, value=99)
+            
+            new_question = st.text_input("질문 *", placeholder="예: 재택근무 가능한가요?")
+            new_answer = st.text_area("답변 *", placeholder="답변을 입력하세요")
+            
+            col1, col2 = st.columns(2)
+            new_show_faq = col1.checkbox("메인 FAQ에 표시", value=True)
+            new_active = col2.checkbox("활성화", value=True)
+            
+            submitted = st.form_submit_button("💾 등록", type="primary", use_container_width=True)
+            if submitted:
+                if not new_question or not new_answer:
+                    st.error("질문과 답변은 필수입니다.")
+                else:
+                    try:
+                        create_knowledge({
+                            "category": new_category,
+                            "question": new_question,
+                            "answer": new_answer,
+                            "display_order": new_order,
+                            "show_in_faq": new_show_faq,
+                            "is_active": new_active,
+                        })
+                        st.success("✅ 등록 완료!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"실패: {e}")
+    
+    st.divider()
+    
+    kb_items = get_all_knowledge()
+    if not kb_items:
+        st.info("등록된 FAQ가 없습니다.")
+    else:
+        for item in kb_items:
+            with st.expander(f"**[{item.get('category', '기타')}]** {item.get('question', '(질문 없음)')[:40]}..."):
+                with st.form(f"edit_faq_{item['id']}"):
+                    ed_q = st.text_input("질문", value=item.get('question') or "", key=f"faq_q_{item['id']}")
+                    ed_a = st.text_area("답변", value=item.get('answer') or "", key=f"faq_a_{item['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    ed_cat = col1.selectbox(
+                        "카테고리",
+                        ["회사소개", "담당자", "지원방법", "근무조건", "기타"],
+                        index=["회사소개", "담당자", "지원방법", "근무조건", "기타"].index(item.get('category')) if item.get('category') in ["회사소개", "담당자", "지원방법", "근무조건", "기타"] else 4,
+                        key=f"faq_cat_{item['id']}"
+                    )
+                    ed_order = col2.number_input("순서", min_value=0, value=item.get('display_order') or 0, key=f"faq_ord_{item['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    ed_show = col1.checkbox("FAQ에 표시", value=item.get('show_in_faq', True), key=f"faq_show_{item['id']}")
+                    ed_active = col2.checkbox("활성화", value=item.get('is_active', True), key=f"faq_act_{item['id']}")
+                    
+                    col1, col2 = st.columns(2)
+                    save = col1.form_submit_button("💾 저장", type="primary", use_container_width=True)
+                    delete = col2.form_submit_button("🗑️ 삭제", use_container_width=True)
+                    
+                    if save:
+                        update_knowledge(item['id'], {
+                            "question": ed_q,
+                            "answer": ed_a,
+                            "category": ed_cat,
+                            "display_order": ed_order,
+                            "show_in_faq": ed_show,
+                            "is_active": ed_active,
+                        })
+                        st.success("저장됨!")
+                        st.rerun()
+                    if delete:
+                        delete_knowledge(item['id'])
+                        st.success("삭제됨")
+                        st.rerun()
+
+# =============================================================
+# TAB 5: 사이트 설정
+# =============================================================
+with tab5:
+    st.subheader("⚙️ 사이트 설정")
+    st.caption("첫화면 문구, 담당자 정보, 챗봇 멘트, 주의사항 등을 편집합니다.")
+    
+    settings = get_site_settings()
+    
+    with st.form("settings_form"):
+        st.markdown("### 🎨 메인 페이지")
+        col1, col2 = st.columns([1, 3])
+        new_emoji = col1.text_input("대표 이모지", value=settings.get('hero_emoji', '🤖'))
+        new_title = col2.text_input("헤드라인 제목", value=settings.get('hero_title', ''))
+        new_subtitle = st.text_input("서브타이틀", value=settings.get('hero_subtitle', ''))
+        new_hero_img = st.text_input("상단 이미지 URL (선택)", value=settings.get('hero_image_url', ''))
+        new_intro = st.text_area("회사 소개", value=settings.get('company_intro', ''))
+        
+        st.divider()
+        st.markdown("### 📞 담당자 정보")
+        col1, col2 = st.columns(2)
+        new_m_name = col1.text_input("담당자 이름", value=settings.get('manager_name', ''))
+        new_m_phone = col2.text_input("담당자 전화번호", value=settings.get('manager_phone', ''))
+        new_m_email = st.text_input("담당자 이메일 (선택)", value=settings.get('manager_email', ''))
+        
+        st.divider()
+        st.markdown("### 🔗 외부 링크")
+        new_default_form = st.text_input(
+            "기본 구글폼 URL",
+            value=settings.get('default_google_form_url', ''),
+            help="공고별 구글폼이 없을 때 사용"
+        )
+        new_openchat = st.text_input(
+            "카카오 오픈채팅 URL",
+            value=settings.get('kakao_openchat_url', ''),
+        )
+        
+        st.divider()
+        st.markdown("### 🗺️ 기본 사무실 위치")
+        new_address = st.text_input("기본 사무실 주소", value=settings.get('office_address', ''))
+        
+        st.divider()
+        st.markdown("### 🛡️ 채용 주의사항")
+        st.caption("홈 화면 하단에 표시되는 채용 안내 문구입니다. ※ 마다 자동 줄바꿈됩니다.")
+        new_notice = st.text_area(
+            "주의사항 문구",
+            value=settings.get('notice_text', ''),
+            placeholder="예: 본 채용은 학력/연령/성별 차별 없이 진행됩니다...",
+            height=120,
+        )
+        
+        st.divider()
+        st.markdown("### 🤖 챗봇 설정")
+        st.caption("챗봇 이름, 인사말, 추천 질문 등을 자유롭게 변경하세요!")
+        
+        col1, col2 = st.columns([1, 3])
+        new_bot_emoji = col1.text_input("챗봇 이모지", value=settings.get('chatbot_emoji', '🤖'))
+        new_bot_name = col2.text_input("챗봇 이름", value=settings.get('chatbot_name', '윌비봇'))
+        
+        new_greeting = st.text_input(
+            "메인 인사말",
+            value=settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요"),
+        )
+        new_sub_greeting = st.text_input(
+            "서브 인사말",
+            value=settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!'),
+        )
+        
+        col1, col2 = st.columns(2)
+        new_placeholder = col1.text_input(
+            "입력창 안내",
+            value=settings.get('chatbot_placeholder', '편하게 질문 주세요...'),
+        )
+        new_empty_msg = col2.text_input(
+            "빈 대화 문구",
+            value=settings.get('chatbot_empty_msg', '대화를 시작해주세요!'),
+        )
+        
+        new_thinking_msg = st.text_input(
+            "답변 대기 문구",
+            value=settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요...'),
+        )
+        
+        st.markdown("**💡 추천 질문 (챗봇 시작 시 표시)**")
+        col1, col2 = st.columns(2)
+        new_sug_q1 = col1.text_input("추천 질문 1", value=settings.get('suggested_q_1', '신입도 가능해요?'))
+        new_sug_q2 = col2.text_input("추천 질문 2", value=settings.get('suggested_q_2', '나에게 맞는 채용은?'))
+        col1, col2 = st.columns(2)
+        new_sug_q3 = col1.text_input("추천 질문 3", value=settings.get('suggested_q_3', '급여 얼마에요?'))
+        new_sug_q4 = col2.text_input("추천 질문 4", value=settings.get('suggested_q_4', '교육 기간은?'))
+        
+        st.markdown("**🎭 말투 & 동작**")
+        new_tone = st.selectbox(
+            "말투 스타일",
+            ["friendly", "casual", "formal"],
+            format_func=lambda x: {"friendly": "😊 친근하게", "casual": "🙌 편하게", "formal": "🎩 격식있게"}[x],
+            index=["friendly", "casual", "formal"].index(settings.get('chatbot_tone', 'friendly'))
+        )
+        new_auto_apply = st.checkbox(
+            "대화 중 자동 지원 유도",
+            value=settings.get('chatbot_auto_apply_prompt', 'true') == 'true',
+        )
+        
+        submitted = st.form_submit_button("💾 모든 설정 저장", type="primary", use_container_width=True)
+        
+        if submitted:
+            updates = {
+                'hero_emoji': new_emoji,
+                'hero_title': new_title,
+                'hero_subtitle': new_subtitle,
+                'hero_image_url': new_hero_img,
+                'company_intro': new_intro,
+                'manager_name': new_m_name,
+                'manager_phone': new_m_phone,
+                'manager_email': new_m_email,
+                'default_google_form_url': new_default_form,
+                'kakao_openchat_url': new_openchat,
+                'office_address': new_address,
+                'notice_text': new_notice,
+                'chatbot_name': new_bot_name,
+                'chatbot_emoji': new_bot_emoji,
+                'chatbot_greeting': new_greeting,
+                'chatbot_sub_greeting': new_sub_greeting,
+                'chatbot_placeholder': new_placeholder,
+                'chatbot_empty_msg': new_empty_msg,
+                'chatbot_thinking_msg': new_thinking_msg,
+                'suggested_q_1': new_sug_q1,
+                'suggested_q_2': new_sug_q2,
+                'suggested_q_3': new_sug_q3,
+                'suggested_q_4': new_sug_q4,
+                'chatbot_tone': new_tone,
+                'chatbot_auto_apply_prompt': 'true' if new_auto_apply else 'false',
+            }
+            try:
+                for k, v in updates.items():
+                    update_setting(k, v)
+                st.success("✅ 모든 설정이 저장되었습니다!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"저장 실패: {e}")
+
+# =============================================================
+# TAB 6: 대화 기록
+# =============================================================
+with tab6:
+    st.subheader("💬 AI 챗봇 대화 기록")
+    conversations = get_all_conversations()
+    
+    if conversations:
+        total = len(conversations)
+        needs_human = sum(1 for c in conversations if c['needs_human'])
+        unique_sessions = len(set(c['session_id'] for c in conversations))
+        
+        col1, col2, col3 = st.columns(3)
+        col1.metric("총 대화 수", f"{total:,}")
+        col2.metric("순 방문자 수", f"{unique_sessions:,}")
+        col3.metric("담당자 연결 필요", f"{needs_human:,}")
+        
+        st.divider()
+        
+        df = pd.DataFrame([{
+            "시간": c['created_at'][:19].replace('T', ' '),
+            "세션": c['session_id'][:8],
+            "질문": c['user_question'],
+            "답변": c['ai_answer'],
+            "관련공고": c['jobs']['title'] if c.get('jobs') else "",
+            "담당자필요": "✅" if c['needs_human'] else "",
+        } for c in conversations])
+        
+        show_only_needs_human = st.checkbox("⚠️ 담당자 연결 필요한 것만 보기")
+        if show_only_needs_human:
+            df = df[df['담당자필요'] == '✅']
+        
+        st.dataframe(df, use_container_width=True, hide_index=True)
+        
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='대화기록')
+        
+        st.download_button(
+            "📥 엑셀 다운로드",
+            data=output.getvalue(),
+            file_name=f"conversations_{datetime.now().strftime('%Y%m%d')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    else:
+        st.info("아직 대화 기록이 없습니다.")
