@@ -857,7 +857,7 @@ if notice_text:
         'padding: 1rem 0.5rem 0.5rem; '
         'margin: 1.5rem 0 0.5rem; '
         'color: #CBD5E1; '      
-        'font-size: 0.65rem; '
+        'font-size: 0.55rem; '
         'line-height: 1.4; '
         'font-weight: 400;'
         '">'
