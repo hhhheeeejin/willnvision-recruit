@@ -315,3 +315,38 @@ def get_stats():
         'needs_human_count': needs_human,
         'applicants_total': applicants_total,
     }
+
+# ============ 이미지 업로드 (Supabase Storage) ============
+
+def upload_image(file_bytes, filename):
+    """
+    이미지 파일을 Supabase Storage의 job-images 버킷에 업로드
+    """
+    try:
+        sb = get_supabase_admin()
+        ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'jpg'
+        unique_name = f"{uuid.uuid4()}.{ext}"
+        
+        sb.storage.from_("job-images").upload(
+            unique_name, 
+            file_bytes,
+            file_options={"content-type": f"image/{ext}"}
+        )
+        
+        url = sb.storage.from_("job-images").get_public_url(unique_name)
+        return url
+    
+    except Exception as e:
+        print(f"❌ 이미지 업로드 실패: {e}")
+        return None
+
+
+def delete_image(url):
+    """이미지 삭제"""
+    try:
+        sb = get_supabase_admin()
+        filename = url.split('/')[-1].split('?')[0]
+        sb.storage.from_("job-images").remove([filename])
+        return True
+    except Exception:
+        return False
