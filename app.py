@@ -25,7 +25,7 @@ if "messages" not in st.session_state:
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "chat"
 
-# 사이트 설정 불러오기
+# 사이트 설정
 settings = get_site_settings()
 hero_title = settings.get('hero_title', '윌앤비전 채용팀')
 hero_subtitle = settings.get('hero_subtitle', '수시채용 진행중')
@@ -222,6 +222,11 @@ html, body, [class*="css"] {
     color: #1E293B !important;
 }
 
+[data-testid="stExpander"] img {
+    border-radius: 12px !important;
+    margin: 8px 0 !important;
+}
+
 .stButton > button {
     border-radius: 14px !important;
     font-weight: 700 !important;
@@ -406,7 +411,7 @@ html, body, [class*="css"] {
 
 st.html(CUSTOM_CSS)
 
-# 히어로 영역
+# 히어로
 if hero_image:
     st.image(hero_image, use_container_width=True)
 
@@ -420,7 +425,7 @@ HERO_HTML = (
 )
 st.html(HERO_HTML)
 
-# 모집 공고 (드롭다운)
+# 모집 공고
 st.html('<div class="section-header">📌 모집 중인 공고</div>')
 
 jobs = get_active_jobs_with_center()
@@ -432,6 +437,11 @@ else:
         status_emoji = "🟢" if job['status'] == '모집중' else ("🟡" if job['status'] == '재오픈예정' else "⚫")
         
         with st.expander(f"{status_emoji} **{job['title']}**", expanded=False):
+            # 🖼️ 공고 이미지 (있으면 상단에 표시)
+            if job.get('image_url'):
+                st.image(job['image_url'], use_container_width=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+            
             detail_lines = []
             if job.get('centers'):
                 detail_lines.append(f"🏢 **{job['centers']['name']}**")
@@ -457,7 +467,7 @@ else:
                 st.markdown("---")
                 st.caption(job['description'])
             
-            # 🌐 외부 채용 사이트 링크 (강조 박스)
+            # 🌐 외부 채용 사이트 링크
             ext_url = job.get('external_url')
             ext_site = job.get('external_site_name') or '외부 사이트'
             if ext_url:
@@ -510,7 +520,7 @@ else:
                 else:
                     st.button("📝 지원 준비중", key=f"apply_{job['id']}", use_container_width=True, disabled=True)
 
-# 기능 탭 선택 (4개)
+# 기능 탭
 st.html('<div class="section-header">⚡ 기능 선택</div>')
 
 tab_cols = st.columns(4)
@@ -541,9 +551,7 @@ with tab_cols[3]:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# ============================================
 # 탭 1: AI 상담사
-# ============================================
 if st.session_state.active_tab == "chat":
     
     def build_system_prompt():
@@ -698,9 +706,7 @@ if st.session_state.active_tab == "chat":
                 st.rerun()
 
 
-# ============================================
 # 탭 2: 출근 거리
-# ============================================
 elif st.session_state.active_tab == "distance":
     st.markdown("#### 🚇 출근 경로 확인")
     st.caption("집 주소 / 역 이름을 입력하세요")
@@ -794,9 +800,7 @@ elif st.session_state.active_tab == "distance":
             st.caption("👆 출발지를 입력하거나 선택해주세요.")
 
 
-# ============================================
 # 탭 3: 지원 문의
-# ============================================
 elif st.session_state.active_tab == "contact":
     st.markdown("#### 🙋 지원 문의")
     st.caption(f"{manager_name}님께 직접 문의하세요!")
@@ -841,7 +845,7 @@ if faqs:
         with st.expander(f"❓ {faq.get('question', '')}"):
             st.write(faq.get('answer', ''))
 
-# 주의사항 박스
+# 주의사항
 notice_text = settings.get('notice_text', '')
 if notice_text:
     formatted_notice = notice_text.replace('※ ', '<br>※ ').replace('• ', '<br>• ').strip()
