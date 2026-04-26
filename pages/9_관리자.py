@@ -707,6 +707,18 @@ with tab5:
         st.divider()
         st.markdown("### 🗺️ 기본 사무실 위치")
         new_address = st.text_input("기본 사무실 주소", value=settings.get('office_address', ''))
+
+        st.divider()
+        st.markdown("### 🛡️ 채용 주의사항")
+        st.caption("홈 화면 하단에 표시되는 채용 안내 문구입니다")
+        
+        new_notice = st.text_area(
+            "주의사항 문구",
+            value=settings.get('notice_text', ''),
+            placeholder="예: 본 채용은 학력/연령/성별 차별 없이 진행됩니다...",
+            height=100,
+            help="채용 관련 주의사항, 개인정보 안내 등을 자유롭게 입력하세요"
+        )
         
         st.divider()
         st.markdown("### 🤖 챗봇 설정")
@@ -775,6 +787,7 @@ with tab5:
                 'default_google_form_url': new_default_form,
                 'kakao_openchat_url': new_openchat,
                 'office_address': new_address,
+                'notice_text': new_notice,                   
                 'chatbot_name': new_bot_name,
                 'chatbot_emoji': new_bot_emoji,
                 'chatbot_greeting': new_greeting,
