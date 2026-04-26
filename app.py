@@ -838,8 +838,31 @@ if faqs:
             st.write(faq.get('answer', ''))
 
 # ============================================
-# 푸터
+# 주의사항 + 푸터
 # ============================================
+
+# 주의사항 박스 (관리자 설정값 사용)
+notice_text = settings.get('notice_text', '')
+if notice_text:
+    NOTICE_HTML = (
+        '<div style="'
+        'background: #EFF6FF; '
+        'border: 1px solid #BFDBFE; '
+        'border-radius: 14px; '
+        'padding: 1rem 1.2rem; '
+        'margin: 1.5rem 0 1rem; '
+        'color: #1E3A8A; '
+        'font-size: 0.78rem; '
+        'line-height: 1.7; '
+        'font-weight: 500;'
+        '">'
+        '<div style="font-weight: 700; margin-bottom: 0.4rem;">🛡️ 채용 안내</div>'
+        f'{notice_text}'
+        '</div>'
+    )
+    st.html(NOTICE_HTML)
+
+# 푸터
 FOOTER_HTML = (
     '<div class="footer">'
     '💬 궁금한 점은 AI 상담사가 24시간 답변해드립니다<br>'
