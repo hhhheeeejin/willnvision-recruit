@@ -10,6 +10,7 @@ from utils.db import (
     get_stats, get_popular_jobs,
     get_all_centers, create_center, update_center, delete_center, get_active_centers,
     get_all_center_faqs, create_center_faq, update_center_faq, delete_center_faq,
+    upload_image, delete_image,
 )
 
 st.set_page_config(page_title="관리자", page_icon="🔐", layout="wide")
@@ -108,7 +109,7 @@ with tab1:
         st.caption("AI가 답변 못한 질문들. 💬 대화기록 탭에서 확인하세요.")
 
 # =============================================================
-# TAB 2: 공고 관리 (이미지 업로드 제거 + 외부 채용 사이트 추가)
+# TAB 2: 공고 관리 (이미지 업로드 추가)
 # =============================================================
 with tab2:
     st.subheader("📋 공고 관리")
@@ -140,6 +141,41 @@ with tab2:
             new_center_id = None
             selected_center = None
             st.warning("⚠️ 등록된 센터가 없습니다. '🏢 센터 관리' 탭에서 먼저 센터를 추가해주세요.")
+        
+        # 🖼️ 이미지 업로드 (폼 밖에서)
+        st.markdown("**🖼️ 공고 이미지 (선택)**")
+        st.caption("공고 카드 펼치면 상단에 표시됩니다. 1MB 이하 권장")
+        
+        img_method = st.radio(
+            "이미지 추가 방식",
+            ["없음", "📁 파일 업로드", "🔗 URL 입력"],
+            horizontal=True,
+            key="new_img_method"
+        )
+        
+        new_image_url_temp = ""
+        uploaded_file_temp = None
+        
+        if img_method == "📁 파일 업로드":
+            uploaded_file_temp = st.file_uploader(
+                "이미지 선택", 
+                type=["png", "jpg", "jpeg", "gif", "webp"],
+                key="new_img_upload",
+                help="PNG, JPG, JPEG, GIF, WebP 지원"
+            )
+            if uploaded_file_temp:
+                st.image(uploaded_file_temp, width=300, caption="✅ 미리보기")
+        elif img_method == "🔗 URL 입력":
+            new_image_url_temp = st.text_input(
+                "이미지 URL",
+                placeholder="https://...",
+                key="new_img_url"
+            )
+            if new_image_url_temp:
+                try:
+                    st.image(new_image_url_temp, width=300, caption="✅ 미리보기")
+                except Exception:
+                    st.warning("⚠️ URL이 잘못되었거나 이미지를 불러올 수 없어요.")
         
         with st.form("new_job_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -187,7 +223,7 @@ with tab2:
             
             # 🌐 외부 채용 사이트
             st.markdown("**🌐 외부 채용 사이트 (선택)**")
-            st.caption("알바몬, 잡코리아 등에 공고 올린 경우 링크 추가 (공고 카드 하단에 강조 표시됩니다)")
+            st.caption("알바몬, 잡코리아 등에 공고 올린 경우 링크 추가")
             col1, col2 = st.columns([1, 2])
             new_external_site = col1.text_input("사이트명", placeholder="예: 알바몬")
             new_external_url = col2.text_input("URL", placeholder="https://www.albamon.com/...")
@@ -203,6 +239,19 @@ with tab2:
                 elif not new_center_id:
                     st.error("근무 센터를 선택해주세요.")
                 else:
+                    # 이미지 처리
+                    final_image_url = ""
+                    if img_method == "📁 파일 업로드" and uploaded_file_temp:
+                        with st.spinner("이미지 업로드 중..."):
+                            file_bytes = uploaded_file_temp.getvalue()
+                            uploaded_url = upload_image(file_bytes, uploaded_file_temp.name)
+                            if uploaded_url:
+                                final_image_url = uploaded_url
+                            else:
+                                st.warning("⚠️ 이미지 업로드 실패, 공고만 등록합니다.")
+                    elif img_method == "🔗 URL 입력" and new_image_url_temp:
+                        final_image_url = new_image_url_temp
+                    
                     data = {
                         "title": new_title,
                         "category": new_category,
@@ -220,6 +269,7 @@ with tab2:
                         "open_chat_url": new_chat_url,
                         "external_url": new_external_url,
                         "external_site_name": new_external_site,
+                        "image_url": final_image_url,
                         "status": new_status,
                         "display_order": new_order,
                     }
@@ -241,6 +291,40 @@ with tab2:
     else:
         for job in jobs:
             with st.expander(f"**{job['title']}** — {job['status']}", expanded=False):
+                
+                # 🖼️ 현재 이미지 미리보기 (폼 밖)
+                current_image = job.get('image_url') or ""
+                if current_image:
+                    st.markdown("**🖼️ 현재 이미지**")
+                    st.image(current_image, width=200)
+                
+                # 이미지 변경 라디오 (폼 밖)
+                st.markdown("**🖼️ 이미지 작업**")
+                img_action = st.radio(
+                    "이미지 작업",
+                    ["유지", "📁 새 파일 업로드", "🔗 URL 변경", "🗑️ 삭제"],
+                    horizontal=True,
+                    key=f"img_action_{job['id']}",
+                    label_visibility="collapsed"
+                )
+                
+                new_upload_file = None
+                new_image_url_input = current_image
+                
+                if img_action == "📁 새 파일 업로드":
+                    new_upload_file = st.file_uploader(
+                        "새 이미지 선택",
+                        type=["png", "jpg", "jpeg", "gif", "webp"],
+                        key=f"upload_{job['id']}"
+                    )
+                    if new_upload_file:
+                        st.image(new_upload_file, width=200, caption="✅ 새 이미지 미리보기")
+                elif img_action == "🔗 URL 변경":
+                    new_image_url_input = st.text_input(
+                        "새 이미지 URL",
+                        value=current_image,
+                        key=f"new_url_{job['id']}"
+                    )
                 
                 with st.form(f"edit_job_{job['id']}"):
                     col1, col2 = st.columns(2)
@@ -319,6 +403,20 @@ with tab2:
                     delete_btn = col3.form_submit_button("🗑️ 삭제", use_container_width=True)
                     
                     if save_btn:
+                        # 이미지 처리
+                        final_image = current_image
+                        if img_action == "📁 새 파일 업로드" and new_upload_file:
+                            with st.spinner("이미지 업로드 중..."):
+                                uploaded_url = upload_image(new_upload_file.getvalue(), new_upload_file.name)
+                                if uploaded_url:
+                                    final_image = uploaded_url
+                                else:
+                                    st.warning("⚠️ 이미지 업로드 실패, 기존 이미지 유지")
+                        elif img_action == "🔗 URL 변경":
+                            final_image = new_image_url_input
+                        elif img_action == "🗑️ 삭제":
+                            final_image = ""
+                        
                         data = {
                             "title": ed_title,
                             "category": ed_category,
@@ -336,6 +434,7 @@ with tab2:
                             "open_chat_url": ed_chat_url,
                             "external_url": ed_external_url,
                             "external_site_name": ed_external_site,
+                            "image_url": final_image,
                             "status": ed_status,
                             "display_order": ed_order,
                         }
@@ -418,7 +517,7 @@ with tab3:
     centers = get_all_centers()
     
     if not centers:
-        st.info("등록된 센터가 없습니다. 위에서 추가해주세요.")
+        st.info("등록된 센터가 없습니다.")
     else:
         for c in centers:
             status_badge = "🟢 활성" if c.get('is_active') else "⚫ 비활성"
@@ -446,8 +545,7 @@ with tab3:
 - 휴게실: 3층 (자판기, 전자레인지)
 - 주차: 건물 뒤 3대 (선착순)
 - 분위기: 편안하고 수평적, 평균 30대
-- 점심: 1층 구내식당 or 근처 맛집
-- 복리후생: 월 교통비 지원, 간식 무한""",
+- 점심: 1층 구내식당 or 근처 맛집""",
                         height=180,
                         help="💡 이 내용을 바탕으로 AI 챗봇이 센터 관련 질문에 답변합니다",
                         key=f"ctr_info_{c['id']}"
@@ -490,7 +588,7 @@ with tab3:
                         except Exception as e:
                             st.error(f"실패: {e}. 이 센터에 연결된 공고가 있을 수 있어요.")
                 
-                # ============ 센터별 FAQ ============
+                # 센터별 FAQ
                 st.markdown("---")
                 st.markdown(f"#### ❓ {c['name']} 전용 FAQ")
                 st.caption("이 센터에만 해당하는 질문-답변을 등록하세요")
@@ -562,7 +660,7 @@ with tab3:
                     st.caption("💡 등록된 FAQ가 없습니다. 위에서 추가해보세요.")
 
 # =============================================================
-# TAB 4: FAQ 관리 (공통)
+# TAB 4: FAQ 관리
 # =============================================================
 with tab4:
     st.subheader("❓ 공통 FAQ 관리")
