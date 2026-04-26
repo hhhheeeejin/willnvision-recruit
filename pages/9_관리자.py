@@ -7,7 +7,6 @@ from utils.db import (
     get_all_conversations,
     get_all_knowledge, create_knowledge, update_knowledge, delete_knowledge,
     get_site_settings, update_setting,
-    upload_image,
     get_stats, get_popular_jobs,
     get_all_centers, create_center, update_center, delete_center, get_active_centers,
     get_all_center_faqs, create_center_faq, update_center_faq, delete_center_faq,
@@ -85,7 +84,6 @@ with tab1:
         df_stats = pd.DataFrame(stats_data)
         df_stats = df_stats.sort_values("💬 문의 클릭", ascending=False)
         st.dataframe(df_stats, use_container_width=True, hide_index=True)
-        
         st.caption("💡 전환율 = 지원 클릭 ÷ 문의 클릭 × 100")
     
     st.divider()
@@ -110,7 +108,7 @@ with tab1:
         st.caption("AI가 답변 못한 질문들. 💬 대화기록 탭에서 확인하세요.")
 
 # =============================================================
-# TAB 2: 공고 관리
+# TAB 2: 공고 관리 (이미지 업로드 제거 + 외부 채용 사이트 추가)
 # =============================================================
 with tab2:
     st.subheader("📋 공고 관리")
@@ -118,7 +116,6 @@ with tab2:
     # ============ 새 공고 추가 ============
     with st.expander("➕ 새 공고 추가하기"):
         
-        # 폼 밖에서 센터 선택 (선택값을 폼 안에서 사용 가능)
         active_centers = get_active_centers()
         if active_centers:
             center_options = {c['id']: c['name'] for c in active_centers}
@@ -127,10 +124,9 @@ with tab2:
                 options=list(center_options.keys()),
                 format_func=lambda x: center_options[x],
                 key="new_job_center_select",
-                help="등록된 센터에서 선택하세요. 선택하면 주소/지하철 정보가 자동으로 채워집니다."
+                help="등록된 센터에서 선택. 선택하면 주소/지하철 정보가 자동으로 채워집니다."
             )
             
-            # 선택된 센터 정보 미리보기
             selected_center = next((c for c in active_centers if c['id'] == new_center_id), None)
             if selected_center:
                 info_text = f"**{selected_center['name']}**\n\n"
@@ -150,7 +146,6 @@ with tab2:
             new_title = col1.text_input("직군명 *", placeholder="예: 인바운드 상담원")
             new_category = col2.selectbox("카테고리", ["IB상담", "OB상담", "채팅상담", "사무직", "기타"])
             
-            # 센터 정보로 자동 채우기
             default_subway_line = ""
             default_subway_station = ""
             default_location = ""
@@ -168,7 +163,7 @@ with tab2:
                 
                 default_location = f"{default_subway_station} 인근" if default_subway_station else selected_center.get('address', '')[:20]
             
-            st.caption("💡 아래 정보는 선택한 센터 기반으로 자동 채워졌습니다. 필요시 수정 가능!")
+            st.caption("💡 센터 기반으로 자동 채워졌습니다. 필요시 수정하세요.")
             
             col1, col2, col3 = st.columns(3)
             new_subway_line = col1.text_input("지하철 노선", value=default_subway_line, placeholder="예: 2호선")
@@ -190,19 +185,12 @@ with tab2:
             new_form_url = col1.text_input("구글폼 URL", placeholder="https://forms.gle/...")
             new_chat_url = col2.text_input("오픈채팅 URL", placeholder="https://open.kakao.com/...")
             
-            st.markdown("**🖼️ 이미지 (선택)**")
-            img_method = st.radio("이미지 추가 방식", ["없음", "파일 업로드", "URL 입력"], horizontal=True)
-            
-            new_image_url = ""
-            uploaded_file = None
-            if img_method == "파일 업로드":
-                uploaded_file = st.file_uploader("이미지 선택", type=["png", "jpg", "jpeg"], key="new_img")
-                if uploaded_file:
-                    st.image(uploaded_file, width=200)
-            elif img_method == "URL 입력":
-                new_image_url = st.text_input("이미지 URL", placeholder="https://...")
-                if new_image_url:
-                    st.image(new_image_url, width=200)
+            # 🌐 외부 채용 사이트
+            st.markdown("**🌐 외부 채용 사이트 (선택)**")
+            st.caption("알바몬, 잡코리아 등에 공고 올린 경우 링크 추가 (공고 카드 하단에 강조 표시됩니다)")
+            col1, col2 = st.columns([1, 2])
+            new_external_site = col1.text_input("사이트명", placeholder="예: 알바몬")
+            new_external_url = col2.text_input("URL", placeholder="https://www.albamon.com/...")
             
             new_status = st.selectbox("상태", ["모집중", "마감", "재오픈예정"])
             new_order = st.number_input("표시 순서 (작을수록 위)", min_value=0, value=99)
@@ -215,10 +203,6 @@ with tab2:
                 elif not new_center_id:
                     st.error("근무 센터를 선택해주세요.")
                 else:
-                    if img_method == "파일 업로드" and uploaded_file:
-                        file_bytes = uploaded_file.getvalue()
-                        new_image_url = upload_image(file_bytes, uploaded_file.name) or ""
-                    
                     data = {
                         "title": new_title,
                         "category": new_category,
@@ -232,9 +216,10 @@ with tab2:
                         "education_period": new_education,
                         "features": new_features,
                         "description": new_description,
-                        "image_url": new_image_url,
                         "google_form_url": new_form_url,
                         "open_chat_url": new_chat_url,
+                        "external_url": new_external_url,
+                        "external_site_name": new_external_site,
                         "status": new_status,
                         "display_order": new_order,
                     }
@@ -256,8 +241,6 @@ with tab2:
     else:
         for job in jobs:
             with st.expander(f"**{job['title']}** — {job['status']}", expanded=False):
-                if job.get('image_url'):
-                    st.image(job['image_url'], width=200)
                 
                 with st.form(f"edit_job_{job['id']}"):
                     col1, col2 = st.columns(2)
@@ -306,20 +289,21 @@ with tab2:
                     ed_form_url = col1.text_input("구글폼 URL", value=job.get('google_form_url') or "", key=f"job_form_{job['id']}")
                     ed_chat_url = col2.text_input("오픈채팅 URL", value=job.get('open_chat_url') or "", key=f"job_chat_{job['id']}")
                     
-                    st.markdown("**🖼️ 이미지 수정**")
-                    img_action = st.radio(
-                        "이미지",
-                        ["유지", "새 파일 업로드", "URL 변경", "삭제"],
-                        horizontal=True,
-                        key=f"img_action_{job['id']}"
+                    # 🌐 외부 채용 사이트
+                    st.markdown("**🌐 외부 채용 사이트 (선택)**")
+                    col1, col2 = st.columns([1, 2])
+                    ed_external_site = col1.text_input(
+                        "사이트명", 
+                        value=job.get('external_site_name') or "",
+                        placeholder="예: 알바몬",
+                        key=f"job_ext_site_{job['id']}"
                     )
-                    
-                    ed_image_url = job.get('image_url') or ""
-                    new_upload = None
-                    if img_action == "새 파일 업로드":
-                        new_upload = st.file_uploader("새 이미지", type=["png", "jpg", "jpeg"], key=f"upload_{job['id']}")
-                    elif img_action == "URL 변경":
-                        ed_image_url = st.text_input("새 이미지 URL", value=ed_image_url, key=f"new_url_{job['id']}")
+                    ed_external_url = col2.text_input(
+                        "URL", 
+                        value=job.get('external_url') or "",
+                        placeholder="https://...",
+                        key=f"job_ext_url_{job['id']}"
+                    )
                     
                     col1, col2 = st.columns(2)
                     ed_status = col1.selectbox(
@@ -335,12 +319,6 @@ with tab2:
                     delete_btn = col3.form_submit_button("🗑️ 삭제", use_container_width=True)
                     
                     if save_btn:
-                        final_image_url = ed_image_url
-                        if img_action == "새 파일 업로드" and new_upload:
-                            final_image_url = upload_image(new_upload.getvalue(), new_upload.name) or ed_image_url
-                        elif img_action == "삭제":
-                            final_image_url = ""
-                        
                         data = {
                             "title": ed_title,
                             "category": ed_category,
@@ -354,9 +332,10 @@ with tab2:
                             "education_period": ed_education,
                             "features": ed_features,
                             "description": ed_description,
-                            "image_url": final_image_url,
                             "google_form_url": ed_form_url,
                             "open_chat_url": ed_chat_url,
+                            "external_url": ed_external_url,
+                            "external_site_name": ed_external_site,
                             "status": ed_status,
                             "display_order": ed_order,
                         }
@@ -393,15 +372,14 @@ with tab3:
             
             col1, col2 = st.columns(2)
             nc_subway = col1.text_input("지하철 정보", placeholder="예: 2호선 강남역 3번 출구")
-            nc_bus = col2.text_input("버스 정보", placeholder="예: 강남역 정류장 (간선 143, 362)")
+            nc_bus = col2.text_input("버스 정보", placeholder="예: 강남역 정류장")
             
             nc_desc = st.text_area("센터 설명", placeholder="이 센터에서 운영하는 업무 등")
             
             nc_info_note = st.text_area(
                 "📝 센터 고유 정보 (AI 챗봇 참조용)",
-                placeholder="휴게실 위치, 주차 정보, 분위기, 복리후생 등 자유롭게",
+                placeholder="휴게실 위치, 주차 정보, 분위기, 복리후생 등",
                 height=120,
-                help="AI 챗봇이 이 정보를 참조해서 센터 관련 질문에 답변합니다"
             )
             
             col1, col2 = st.columns(2)
@@ -672,7 +650,7 @@ with tab4:
 # =============================================================
 with tab5:
     st.subheader("⚙️ 사이트 설정")
-    st.caption("첫화면 문구, 담당자 정보, 챗봇 멘트 등을 편집합니다.")
+    st.caption("첫화면 문구, 담당자 정보, 챗봇 멘트, 주의사항 등을 편집합니다.")
     
     settings = get_site_settings()
     
@@ -707,17 +685,15 @@ with tab5:
         st.divider()
         st.markdown("### 🗺️ 기본 사무실 위치")
         new_address = st.text_input("기본 사무실 주소", value=settings.get('office_address', ''))
-
+        
         st.divider()
         st.markdown("### 🛡️ 채용 주의사항")
-        st.caption("홈 화면 하단에 표시되는 채용 안내 문구입니다")
-        
+        st.caption("홈 화면 하단에 표시되는 채용 안내 문구입니다. ※ 마다 자동 줄바꿈됩니다.")
         new_notice = st.text_area(
             "주의사항 문구",
             value=settings.get('notice_text', ''),
             placeholder="예: 본 채용은 학력/연령/성별 차별 없이 진행됩니다...",
-            height=100,
-            help="채용 관련 주의사항, 개인정보 안내 등을 자유롭게 입력하세요"
+            height=120,
         )
         
         st.divider()
@@ -787,7 +763,7 @@ with tab5:
                 'default_google_form_url': new_default_form,
                 'kakao_openchat_url': new_openchat,
                 'office_address': new_address,
-                'notice_text': new_notice,                   
+                'notice_text': new_notice,
                 'chatbot_name': new_bot_name,
                 'chatbot_emoji': new_bot_emoji,
                 'chatbot_greeting': new_greeting,
