@@ -49,7 +49,7 @@ bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에�
 # OpenAI
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# CSS - 다크모드 대응 + 항상 잘 보이게
+# CSS
 CUSTOM_CSS = """
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" rel="stylesheet">
 <style>
@@ -323,7 +323,6 @@ html, body, [class*="css"] {
     font-weight: 500;
 }
 
-/* 모든 마크다운 텍스트 - 항상 어둡게 강제 */
 .stMarkdown p,
 .stMarkdown li,
 .stMarkdown span,
@@ -333,13 +332,11 @@ html, body, [class*="css"] {
     color: #1E293B !important;
 }
 
-/* caption */
 [data-testid="stCaptionContainer"] p,
 [data-testid="stCaptionContainer"] {
     color: #475569 !important;
 }
 
-/* info / warning / success 박스 텍스트 */
 [data-testid="stAlert"] p,
 [data-testid="stAlert"] div {
     color: #1E293B !important;
@@ -351,25 +348,20 @@ html, body, [class*="css"] {
     .section-header { font-size: 1.05rem; }
 }
 
-/* 다크모드에서도 흰 배경 + 어두운 글씨 강제 */
 @media (prefers-color-scheme: dark) {
     .stApp {
         background: white !important;
     }
-    
     .block-container {
         background: white !important;
     }
-    
     [data-testid="stExpander"] {
         background: white !important;
     }
-    
     [data-testid="stExpander"] summary,
     [data-testid="stExpander"] summary p {
         color: #1E3A8A !important;
     }
-    
     .stMarkdown p,
     .stMarkdown li,
     [data-testid="stMarkdownContainer"] p,
@@ -377,43 +369,34 @@ html, body, [class*="css"] {
     [data-testid="stMarkdownContainer"] span {
         color: #1E293B !important;
     }
-    
     .section-header {
         color: #1E40AF !important;
     }
-    
     .cute-greeting-title {
         color: #1E40AF !important;
     }
-    
     .cute-greeting-sub {
         color: #3B82F6 !important;
     }
-    
     [data-testid="stCaptionContainer"],
     [data-testid="stCaptionContainer"] p {
         color: #475569 !important;
     }
-    
     [data-testid="stChatMessage"] {
         background: #F8FAFC !important;
     }
-    
     [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
         color: #1E293B !important;
     }
-    
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
         background: white !important;
         color: #1E293B !important;
     }
-    
     [data-testid="stAlert"] p,
     [data-testid="stAlert"] div {
         color: #1E293B !important;
     }
-    
     .footer {
         color: #64748B !important;
     }
@@ -423,9 +406,7 @@ html, body, [class*="css"] {
 
 st.html(CUSTOM_CSS)
 
-# ============================================
 # 히어로 영역
-# ============================================
 if hero_image:
     st.image(hero_image, use_container_width=True)
 
@@ -439,9 +420,7 @@ HERO_HTML = (
 )
 st.html(HERO_HTML)
 
-# ============================================
 # 모집 공고 (드롭다운)
-# ============================================
 st.html('<div class="section-header">📌 모집 중인 공고</div>')
 
 jobs = get_active_jobs_with_center()
@@ -453,9 +432,6 @@ else:
         status_emoji = "🟢" if job['status'] == '모집중' else ("🟡" if job['status'] == '재오픈예정' else "⚫")
         
         with st.expander(f"{status_emoji} **{job['title']}**", expanded=False):
-            if job.get('image_url'):
-                st.image(job['image_url'], use_container_width=True)
-            
             detail_lines = []
             if job.get('centers'):
                 detail_lines.append(f"🏢 **{job['centers']['name']}**")
@@ -481,6 +457,38 @@ else:
                 st.markdown("---")
                 st.caption(job['description'])
             
+            # 🌐 외부 채용 사이트 링크 (강조 박스)
+            ext_url = job.get('external_url')
+            ext_site = job.get('external_site_name') or '외부 사이트'
+            if ext_url:
+                EXT_LINK_HTML = (
+                    f'<a href="{ext_url}" target="_blank" style="text-decoration: none;">'
+                    '<div style="'
+                    'margin-top: 12px; '
+                    'padding: 12px 14px; '
+                    'background: linear-gradient(135deg, #FFF7ED 0%, #FED7AA 100%); '
+                    'border-radius: 12px; '
+                    'border-left: 4px solid #F97316; '
+                    'cursor: pointer; '
+                    'transition: transform 0.2s; '
+                    'box-shadow: 0 2px 6px rgba(249, 115, 22, 0.15);'
+                    '">'
+                    '<div style="'
+                    'font-size: 0.88rem; '
+                    'font-weight: 700; '
+                    'color: #9A3412; '
+                    'display: flex; '
+                    'align-items: center; '
+                    'justify-content: space-between;'
+                    '">'
+                    f'<span>📋 {ext_site}에서 자세한 공고 확인하러 가기</span>'
+                    '<span style="font-size: 1rem;">→</span>'
+                    '</div>'
+                    '</div>'
+                    '</a>'
+                )
+                st.html(EXT_LINK_HTML)
+            
             st.markdown("<br>", unsafe_allow_html=True)
             
             col1, col2 = st.columns(2)
@@ -502,9 +510,7 @@ else:
                 else:
                     st.button("📝 지원 준비중", key=f"apply_{job['id']}", use_container_width=True, disabled=True)
 
-# ============================================
 # 기능 탭 선택 (4개)
-# ============================================
 st.html('<div class="section-header">⚡ 기능 선택</div>')
 
 tab_cols = st.columns(4)
@@ -827,9 +833,7 @@ elif st.session_state.active_tab == "contact":
         phone_clean = manager_phone.replace('-', '')
         st.link_button(f"{manager_phone}", f"tel:{phone_clean}", use_container_width=True)
 
-# ============================================
 # FAQ
-# ============================================
 faqs = get_faq_items()
 if faqs:
     st.html('<div class="section-header">💡 자주 묻는 질문</div>')
@@ -837,14 +841,9 @@ if faqs:
         with st.expander(f"❓ {faq.get('question', '')}"):
             st.write(faq.get('answer', ''))
 
-# ============================================
-# 주의사항 + 푸터
-# ============================================
-
-# 주의사항 박스 (관리자 설정값 사용)
+# 주의사항 박스
 notice_text = settings.get('notice_text', '')
 if notice_text:
-    # ※ 마다 줄바꿈 자동 처리
     formatted_notice = notice_text.replace('※ ', '<br>※ ').replace('• ', '<br>• ').strip()
     if formatted_notice.startswith('<br>'):
         formatted_notice = formatted_notice[4:]
@@ -852,13 +851,12 @@ if notice_text:
     NOTICE_HTML = (
         '<div style="'
         'background: transparent; '
-        'border-top: none; '
-        'padding-top: 0.5rem; '
+        'border-top: 1px solid #F1F5F9; '
         'padding: 1rem 0.5rem 0.5rem; '
         'margin: 1.5rem 0 0.5rem; '
-        'color: #94A3B8; '      
-        'font-size: 0.50rem; '
-        'line-height: 1.4; '
+        'color: #94A3B8; '
+        'font-size: 0.7rem; '
+        'line-height: 1.6; '
         'font-weight: 400;'
         '">'
         '<div style="'
