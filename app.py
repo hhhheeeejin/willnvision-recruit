@@ -25,6 +25,10 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "chat"
+if "from_job_card" not in st.session_state:
+    st.session_state.from_job_card = False
+if "messages_history" not in st.session_state:
+    st.session_state.messages_history = []  # 이전 대화 백업용
 
 # 사이트 설정
 settings = get_site_settings()
@@ -59,9 +63,7 @@ html, body, [class*="css"] {
     letter-spacing: -0.4px;
 }
 
-html {
-    scroll-behavior: smooth;
-}
+html { scroll-behavior: smooth; }
 
 .block-container {
     padding-top: 1rem !important;
@@ -83,84 +85,55 @@ html {
 }
 
 .hero-section::before {
-    content: "🎁";
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    font-size: 1.5rem;
-    opacity: 0.4;
-    transform: rotate(15deg);
+    content: "🎁"; position: absolute; top: 20px; right: 20px;
+    font-size: 1.5rem; opacity: 0.4; transform: rotate(15deg);
 }
 
 .hero-section::after {
-    content: "✨";
-    position: absolute;
-    bottom: 30px;
-    left: 20px;
-    font-size: 1.3rem;
-    opacity: 0.4;
+    content: "✨"; position: absolute; bottom: 30px; left: 20px;
+    font-size: 1.3rem; opacity: 0.4;
 }
 
-.hero-emoji {
-    font-size: 3rem;
-    margin-bottom: 0.5rem;
-    position: relative;
-    z-index: 1;
-}
+.hero-emoji { font-size: 3rem; margin-bottom: 0.5rem; position: relative; z-index: 1; }
 
 .hero-title {
-    font-size: 1.7rem;
-    font-weight: 900;
-    margin: 0.3rem 0;
-    color: white;
-    letter-spacing: -1px;
-    line-height: 1.2;
-    position: relative;
-    z-index: 1;
+    font-size: 1.7rem; font-weight: 900; margin: 0.3rem 0;
+    color: white; letter-spacing: -1px; line-height: 1.2;
+    position: relative; z-index: 1;
 }
 
 .hero-subtitle {
-    font-size: 1rem;
-    color: white;
-    opacity: 0.95;
-    margin: 0.4rem 0;
-    font-weight: 600;
-    position: relative;
-    z-index: 1;
+    font-size: 1rem; color: white; opacity: 0.95;
+    margin: 0.4rem 0; font-weight: 600;
+    position: relative; z-index: 1;
 }
 
 .hero-phone {
-    display: inline-block;
-    background: rgba(255, 255, 255, 0.22);
-    padding: 0.4rem 1rem;
-    border-radius: 20px;
-    font-size: 0.82rem;
-    font-weight: 600;
-    margin-top: 0.7rem;
-    position: relative;
-    z-index: 1;
+    display: inline-block; background: rgba(255, 255, 255, 0.22);
+    padding: 0.4rem 1rem; border-radius: 20px;
+    font-size: 0.82rem; font-weight: 600; margin-top: 0.7rem;
+    position: relative; z-index: 1;
 }
 
 .section-header {
-    font-size: 1.15rem;
-    font-weight: 800;
-    margin: 1.5rem 0 0.8rem;
-    padding-left: 0.6rem;
+    font-size: 1.15rem; font-weight: 800;
+    margin: 1.5rem 0 0.8rem; padding-left: 0.6rem;
     color: #1E40AF !important;
-    letter-spacing: -0.6px;
-    position: relative;
+    letter-spacing: -0.6px; position: relative;
 }
 
 .section-header::before {
-    content: "";
-    position: absolute;
-    left: -4px;
-    top: 50%;
+    content: ""; position: absolute; left: -4px; top: 50%;
     transform: translateY(-50%);
-    width: 5px;
-    height: 22px;
+    width: 5px; height: 22px;
     background: linear-gradient(180deg, #4285F4 0%, #1E40AF 100%);
     border-radius: 5px;
+}
+
+.compact-header {
+    font-size: 0.85rem; font-weight: 700;
+    margin: 1.2rem 0 0.4rem;
+    color: #94A3B8 !important;
 }
 
 [data-testid="stExpander"] {
@@ -175,7 +148,6 @@ html {
 [data-testid="stExpander"]:hover {
     transform: translateY(-1px);
     border-color: #93C5FD !important;
-    box-shadow: 0 4px 14px rgba(66, 133, 244, 0.15) !important;
 }
 
 [data-testid="stExpander"] summary {
@@ -183,31 +155,20 @@ html {
     font-weight: 800 !important;
     color: #1E3A8A !important;
     font-size: 0.95rem !important;
-    letter-spacing: -0.4px;
     list-style: none !important;
-    cursor: pointer;
-    position: relative;
+    cursor: pointer; position: relative;
     display: flex !important;
     align-items: center;
     justify-content: space-between;
 }
 
-[data-testid="stExpander"] summary::-webkit-details-marker {
-    display: none !important;
-}
-
-[data-testid="stExpander"] summary::marker {
-    display: none !important;
-}
+[data-testid="stExpander"] summary::-webkit-details-marker { display: none !important; }
+[data-testid="stExpander"] summary::marker { display: none !important; }
 
 [data-testid="stExpander"] summary::after {
-    content: "▼";
-    font-size: 0.7rem;
-    color: #4285F4;
+    content: "▼"; font-size: 0.7rem; color: #4285F4;
     transition: transform 0.25s ease;
-    margin-left: 0.5rem;
-    display: inline-block;
-    flex-shrink: 0;
+    margin-left: 0.5rem; display: inline-block; flex-shrink: 0;
 }
 
 [data-testid="stExpander"][open] summary::after {
@@ -229,8 +190,24 @@ html {
 }
 
 [data-testid="stExpander"] img {
-    border-radius: 12px !important;
-    margin: 8px 0 !important;
+    border-radius: 12px !important; margin: 8px 0 !important;
+}
+
+.compact-faq [data-testid="stExpander"] {
+    border: 1px solid #E2E8F0 !important;
+    box-shadow: none !important;
+    margin-bottom: 0.3rem !important;
+}
+
+.compact-faq [data-testid="stExpander"] summary {
+    padding: 0.5rem 0.8rem !important;
+    font-size: 0.82rem !important;
+    color: #64748B !important;
+}
+
+.compact-faq [data-testid="stExpander"] summary p {
+    color: #64748B !important;
+    font-weight: 600 !important;
 }
 
 .stButton > button {
@@ -251,7 +228,6 @@ html {
 .stButton > button[kind="primary"]:hover {
     background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%) !important;
     transform: translateY(-2px);
-    box-shadow: 0 5px 16px rgba(66, 133, 244, 0.4) !important;
 }
 
 .stButton > button[kind="secondary"] {
@@ -263,20 +239,17 @@ html {
 .stButton > button[kind="secondary"]:hover {
     background: #EFF6FF !important;
     border-color: #93C5FD !important;
-    color: #1D4ED8 !important;
 }
 
 .stLinkButton > a > button {
     border-radius: 14px !important;
     font-weight: 700 !important;
-    letter-spacing: -0.4px !important;
 }
 
 .stLinkButton > a > button[kind="primary"] {
     background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
     color: white !important;
     border: none !important;
-    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3) !important;
 }
 
 .stTextInput > div > div > input,
@@ -285,7 +258,6 @@ html {
     border: 2px solid #DBEAFE !important;
     background: white !important;
     color: #1E293B !important;
-    font-weight: 500 !important;
 }
 
 .cute-greeting {
@@ -297,25 +269,17 @@ html {
     border: 2px solid rgba(66, 133, 244, 0.15);
 }
 
-.cute-greeting-emoji {
-    font-size: 2.5rem;
-    margin-bottom: 0.4rem;
-}
+.cute-greeting-emoji { font-size: 2.5rem; margin-bottom: 0.4rem; }
 
 .cute-greeting-title {
-    font-size: 1.1rem;
-    font-weight: 800;
+    font-size: 1.1rem; font-weight: 800;
     color: #1E40AF !important;
-    letter-spacing: -0.5px;
-    line-height: 1.4;
+    letter-spacing: -0.5px; line-height: 1.4;
 }
 
 .cute-greeting-sub {
-    font-size: 0.88rem;
-    color: #3B82F6 !important;
-    margin-top: 0.3rem;
-    font-weight: 600;
-    line-height: 1.5;
+    font-size: 0.88rem; color: #3B82F6 !important;
+    margin-top: 0.3rem; font-weight: 600;
 }
 
 [data-testid="stChatMessage"] {
@@ -331,16 +295,14 @@ html {
 
 .footer {
     text-align: center;
-    padding: 1.5rem 0 1rem;
-    color: #64748B !important;
-    font-size: 0.8rem;
-    font-weight: 500;
-    line-height: 1.7;
+    padding: 1rem 0 0.5rem;
+    color: #94A3B8 !important;
+    font-size: 0.7rem;
+    font-weight: 400;
+    line-height: 1.6;
 }
 
-.stMarkdown p,
-.stMarkdown li,
-.stMarkdown span,
+.stMarkdown p, .stMarkdown li, .stMarkdown span,
 [data-testid="stMarkdownContainer"] p,
 [data-testid="stMarkdownContainer"] li,
 [data-testid="stMarkdownContainer"] span {
@@ -351,13 +313,6 @@ html {
 [data-testid="stCaptionContainer"] p,
 [data-testid="stCaptionContainer"] {
     color: #475569 !important;
-    line-height: 1.6 !important;
-}
-
-[data-testid="stAlert"] p,
-[data-testid="stAlert"] div {
-    color: #1E293B !important;
-    line-height: 1.7 !important;
 }
 
 @media (max-width: 640px) {
@@ -371,43 +326,38 @@ html {
     .block-container { background: white !important; }
     [data-testid="stExpander"] { background: white !important; }
     [data-testid="stExpander"] summary,
-    [data-testid="stExpander"] summary p {
-        color: #1E3A8A !important;
-    }
+    [data-testid="stExpander"] summary p { color: #1E3A8A !important; }
+    .compact-faq [data-testid="stExpander"] summary,
+    .compact-faq [data-testid="stExpander"] summary p { color: #64748B !important; }
     .stMarkdown p, .stMarkdown li,
     [data-testid="stMarkdownContainer"] p,
     [data-testid="stMarkdownContainer"] li,
-    [data-testid="stMarkdownContainer"] span {
-        color: #1E293B !important;
-    }
+    [data-testid="stMarkdownContainer"] span { color: #1E293B !important; }
     .section-header { color: #1E40AF !important; }
+    .compact-header { color: #94A3B8 !important; }
     .cute-greeting-title { color: #1E40AF !important; }
     .cute-greeting-sub { color: #3B82F6 !important; }
     [data-testid="stCaptionContainer"],
-    [data-testid="stCaptionContainer"] p {
-        color: #475569 !important;
-    }
+    [data-testid="stCaptionContainer"] p { color: #475569 !important; }
     [data-testid="stChatMessage"] { background: #F8FAFC !important; }
-    [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
-        color: #1E293B !important;
-    }
+    [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p { color: #1E293B !important; }
     .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea {
-        background: white !important;
-        color: #1E293B !important;
-    }
-    [data-testid="stAlert"] p, [data-testid="stAlert"] div {
-        color: #1E293B !important;
-    }
-    .footer { color: #64748B !important; }
+    .stTextArea > div > div > textarea { background: white !important; color: #1E293B !important; }
+    .footer { color: #94A3B8 !important; }
 }
 </style>
+
+<script>
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        const main = window.parent.document.querySelector('section.main');
+        if (main) main.scrollTo({top: 0, behavior: 'auto'});
+    }, 50);
+});
+</script>
 """
 
 st.html(CUSTOM_CSS)
-
-# 페이지 최상단 앵커
-st.html('<div id="page-top"></div>')
 
 # 히어로
 if hero_image:
@@ -472,8 +422,7 @@ else:
                     '<div style="margin-top: 12px; padding: 12px 14px; '
                     'background: linear-gradient(135deg, #FFF7ED 0%, #FED7AA 100%); '
                     'border-radius: 12px; border-left: 4px solid #F97316; '
-                    'cursor: pointer; transition: transform 0.2s; '
-                    'box-shadow: 0 2px 6px rgba(249, 115, 22, 0.15);">'
+                    'cursor: pointer;">'
                     '<div style="font-size: 0.88rem; font-weight: 700; color: #9A3412; '
                     'display: flex; align-items: center; justify-content: space-between;">'
                     f'<span>📋 {ext_site}에서 자세한 공고 확인하러 가기</span>'
@@ -490,6 +439,7 @@ else:
                     st.session_state['preset_question'] = f"{job['title']} 공고에 대해 알려주세요"
                     st.session_state['preset_job_id'] = job['id']
                     st.session_state.active_tab = "chat"
+                    st.session_state.from_job_card = True  # 공고에서 진입 표시
                     increment_job_view(job['id'], st.session_state.session_id)
                     st.rerun()
             with col2:
@@ -512,6 +462,7 @@ with tab_cols[0]:
     if st.button("💬 AI 상담", key="tab_chat", use_container_width=True,
                  type="primary" if st.session_state.active_tab == "chat" else "secondary"):
         st.session_state.active_tab = "chat"
+        st.session_state.from_job_card = False  # 직접 클릭은 공고에서 온 것 아님
         st.rerun()
 
 with tab_cols[1]:
@@ -538,6 +489,16 @@ st.markdown("<br>", unsafe_allow_html=True)
 # 탭 1: AI 상담사
 # ============================================
 if st.session_state.active_tab == "chat":
+    
+    # 🔙 시나리오 1: 공고에서 진입했을 때 뒤로가기 버튼
+    if st.session_state.get('from_job_card'):
+        if st.button("← 공고 목록으로 돌아가기", use_container_width=True, key="back_to_jobs"):
+            st.session_state.from_job_card = False
+            st.session_state.messages = []
+            # 페이지 최상단으로 스크롤하면서 공고 섹션으로
+            st.html('<script>window.parent.document.querySelector("section.main").scrollTo({top: 0, behavior: "smooth"});</script>')
+            st.rerun()
+        st.markdown("<br>", unsafe_allow_html=True)
     
     def build_system_prompt():
         active_jobs_list = get_active_jobs()
@@ -589,7 +550,7 @@ if st.session_state.active_tab == "chat":
         centers_text = "\n".join(center_info_lines)
         
         tone_guide = {
-            'friendly': '말투: 친근하고 따뜻하게. 공감 먼저, 정보 나중. 이모지 자연스럽게.',
+            'friendly': '말투: 친근하고 따뜻하게.',
             'casual': '말투: 편하고 짧게.',
             'formal': '말투: 정중하고 격식있게.'
         }.get(tone, '친근한 말투')
@@ -604,11 +565,8 @@ if st.session_state.active_tab == "chat":
             f"[규칙]\n"
             f"1. 위 정보 안에서만 답변\n"
             f"2. 답변 끝에 '더 궁금한 점 있으세요? 😊'\n"
-            f"3. 센터 관련 질문 → 해당 센터 정보 정확히 답변\n"
-            f"4. 지원 의사 보이면 지원서 안내\n"
-            f"5. 공고 밖 질문은 담당자 연결 안내\n"
-            f"6. 짧고 모바일 친화적으로\n"
-            f"7. 개인정보 수집 금지"
+            f"3. 짧고 모바일 친화적으로\n"
+            f"4. 개인정보 수집 금지"
         )
     
     GREETING_HTML = (
@@ -619,6 +577,16 @@ if st.session_state.active_tab == "chat":
         '</div>'
     )
     st.html(GREETING_HTML)
+    
+    # 🔙 시나리오 3: 새 대화 후 이전 대화 복원 가능 표시
+    if not st.session_state.messages and st.session_state.messages_history:
+        col_restore1, col_restore2 = st.columns([3, 2])
+        with col_restore1:
+            st.caption(f"💬 이전 대화 {len(st.session_state.messages_history)}개 메시지가 있어요")
+        with col_restore2:
+            if st.button("↶ 이전 대화 보기", use_container_width=True, key="restore_chat"):
+                st.session_state.messages = st.session_state.messages_history.copy()
+                st.rerun()
     
     if not st.session_state.messages:
         st.markdown("<br>", unsafe_allow_html=True)
@@ -636,7 +604,7 @@ if st.session_state.active_tab == "chat":
                     st.session_state.preset_question = q
                     st.rerun()
     
-    chat_container = st.container(border=True, height=300)
+    chat_container = st.container(border=True, height=350)
     with chat_container:
         if not st.session_state.messages:
             st.caption(bot_empty)
@@ -675,48 +643,52 @@ if st.session_state.active_tab == "chat":
                 related_job_id=st.session_state.get('preset_job_id'),
                 needs_human=needs_human,
             )
-            
-            # 답변 후 페이지 최상단으로 자동 스크롤
-            st.html('''
-                <script>
-                    setTimeout(function() {
-                        window.parent.document.querySelector('section.main').scrollTo({top: 0, behavior: 'smooth'});
-                    }, 100);
-                </script>
-            ''')
-            
             st.rerun()
         except Exception as e:
             st.error(f"오류 발생. {manager_phone}로 문의해주세요.")
             st.caption(f"에러: {str(e)[:100]}")
     
+    # 🔙 대화 중 버튼: 이전 대화 / 지원 / 새 대화
     if st.session_state.messages:
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
+        
         with col1:
+            # 이전 대화 백업이 있으면 복원 버튼
+            if st.session_state.messages_history and st.session_state.messages_history != st.session_state.messages:
+                if st.button("↶ 이전 대화", use_container_width=True, key="restore_during"):
+                    st.session_state.messages = st.session_state.messages_history.copy()
+                    st.rerun()
+            else:
+                st.empty()
+        
+        with col2:
             if default_form_url:
                 st.link_button("📝 지원하기", default_form_url, use_container_width=True, type="primary")
-        with col2:
+        
+        with col3:
             if st.button("🔄 새 대화", use_container_width=True):
+                # 새 대화 시작 전 현재 대화 백업
+                if st.session_state.messages:
+                    st.session_state.messages_history = st.session_state.messages.copy()
                 st.session_state.messages = []
                 st.rerun()
 
 
 # ============================================
-# 탭 2: 출근 거리 (AI 분석)
+# 탭 2: 출근 거리 (실제 지도 임베드)
 # ============================================
 elif st.session_state.active_tab == "distance":
-    st.markdown("#### 🚇 출근 경로 분석")
+    st.markdown("#### 🚇 출근 경로 확인")
     
-    # 안내 박스
     GUIDE_BOX = (
         '<div style="background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); '
         'padding: 0.9rem 1rem; border-radius: 12px; margin-bottom: 1rem; '
         'border: 1px solid rgba(66, 133, 244, 0.15);">'
         '<div style="font-size: 0.82rem; color: #1E40AF; font-weight: 600; line-height: 1.7;">'
-        '✨ <b>3단계로 출퇴근 정보 알아보기</b><br>'
+        '✨ <b>3단계로 정확한 출퇴근 정보 확인하기</b><br>'
         '1️⃣ 집 주소 입력 (또는 빠른 선택)<br>'
         '2️⃣ 도착지 센터 선택<br>'
-        '3️⃣ 교통수단 선택 후 <b>분석 버튼 클릭!</b>'
+        '3️⃣ 길찾기 버튼 클릭 → 카카오맵/네이버지도에서 정확한 시간 확인!'
         '</div></div>'
     )
     st.html(GUIDE_BOX)
@@ -727,7 +699,6 @@ elif st.session_state.active_tab == "distance":
         placeholder="예: 고양시 호수로 336, 강남역, 서울역",
         label_visibility="collapsed",
         key="start_addr",
-        help="주소를 입력하고 엔터를 누르면 자동 저장됩니다"
     )
     
     st.caption("👇 자주 찾는 출발지")
@@ -761,35 +732,86 @@ elif st.session_state.active_tab == "distance":
             )
             selected_center = next(c for c in centers if c['id'] == sel_id)
         
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # 교통수단 선택
-        st.markdown("**🚏 교통수단 선택**")
-        st.caption("관심있는 교통수단을 골라주세요")
-        
-        sel_transport = st.session_state.get('sel_transport', 'car')
-        
-        t_cols = st.columns(4)
-        transport_labels = [
-            ("car", "🚗 자동차"),
-            ("transit", "🚇 대중교통"),
-            ("bicycle", "🚴 자전거"),
-            ("walk", "🚶 도보"),
-        ]
-        for idx, (key, label) in enumerate(transport_labels):
-            with t_cols[idx]:
-                is_active = (key == sel_transport)
-                if st.button(label, key=f"tr_{key}", use_container_width=True,
-                             type="primary" if is_active else "secondary"):
-                    st.session_state['sel_transport'] = key
-                    st.rerun()
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # 분석 버튼
         if start_address:
-            if st.button("🤖 AI로 출퇴근 정보 분석하기", type="primary", use_container_width=True, key="analyze_btn"):
-                with st.spinner("윌비가 출퇴근 정보 분석 중이에요... 🔍"):
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            ROUTE_HEADER = (
+                '<div style="background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); '
+                'padding: 1rem; border-radius: 14px; text-align: center; '
+                'border: 1px solid rgba(66, 133, 244, 0.15); margin-bottom: 12px;">'
+                f'<div style="font-size: 0.85rem; color: #1E40AF; font-weight: 600;">🏠 {start_address}</div>'
+                '<div style="margin: 0.3rem 0; color: #4285F4;">⬇️</div>'
+                f'<div style="font-weight: 700; color: #1E3A8A; font-size: 1rem;">🏢 {selected_center["name"]}</div>'
+                '</div>'
+            )
+            st.html(ROUTE_HEADER)
+            
+            st.markdown("**🚏 교통수단 선택**")
+            
+            sel_transport = st.session_state.get('sel_transport', 'transit')
+            
+            t_cols = st.columns(4)
+            transport_labels = [
+                ("car", "🚗 자동차"),
+                ("transit", "🚇 대중교통"),
+                ("bicycle", "🚴 자전거"),
+                ("walk", "🚶 도보"),
+            ]
+            for idx, (key, label) in enumerate(transport_labels):
+                with t_cols[idx]:
+                    is_active = (key == sel_transport)
+                    if st.button(label, key=f"tr_{key}", use_container_width=True,
+                                 type="primary" if is_active else "secondary"):
+                        st.session_state['sel_transport'] = key
+                        st.rerun()
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            start_enc = urllib.parse.quote(start_address)
+            end_enc = urllib.parse.quote(selected_center['address'])
+            
+            kakao_url = f"https://map.kakao.com/?sName={start_enc}&eName={end_enc}"
+            
+            naver_modes = {
+                "car": "car",
+                "transit": "transit",
+                "bicycle": "bicycle",
+                "walk": "walk"
+            }
+            naver_mode = naver_modes.get(sel_transport, "transit")
+            naver_url = f"https://map.naver.com/p/directions/-/{end_enc}/{naver_mode}"
+            
+            BIG_BUTTON_INFO = (
+                '<div style="background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%); '
+                'padding: 14px 16px; border-radius: 14px; '
+                'border: 1px solid rgba(34, 197, 94, 0.3); margin-bottom: 12px;">'
+                '<div style="font-size: 0.85rem; font-weight: 700; color: #166534; margin-bottom: 4px;">'
+                '🗺️ 정확한 길찾기 결과 확인'
+                '</div>'
+                '<div style="font-size: 0.78rem; color: #166534; line-height: 1.6;">'
+                '아래 버튼을 누르면 실시간 교통상황이 반영된 정확한 시간·거리·경로를 확인할 수 있어요!'
+                '</div></div>'
+            )
+            st.html(BIG_BUTTON_INFO)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.link_button("🗺️ 카카오맵 길찾기", kakao_url, type="primary", use_container_width=True)
+            with col2:
+                st.link_button("🗺️ 네이버지도 길찾기", naver_url, use_container_width=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            
+            st.markdown("---")
+            st.markdown("##### 🤖 AI에게 추가 정보 물어보기")
+            st.caption("주차·환승·꿀팁 등 실용 정보를 AI가 알려드려요")
+            
+            transport_kr_map = {"car": "자동차", "transit": "대중교통", "bicycle": "자전거", "walk": "도보"}
+            transport_kr = transport_kr_map.get(sel_transport, "교통수단")
+            
+            if st.button(f"💡 {transport_kr} 출퇴근 꿀팁 보기", 
+                         use_container_width=True, key="ask_ai_tip"):
+                with st.spinner("AI가 꿀팁을 정리 중이에요... 🔍"):
                     try:
                         center_info = (
                             f"센터명: {selected_center['name']}\n"
@@ -799,258 +821,59 @@ elif st.session_state.active_tab == "distance":
                             f"주차: {'가능' if selected_center.get('parking_available') else '확인 필요'}\n"
                         )
                         
-                        active_jobs = get_active_jobs()
-                        center_jobs = [j for j in active_jobs if j.get('center_id') == sel_id]
-                        work_hours_info = ""
-                        if center_jobs:
-                            work_hours_info = "\n\n[이 센터의 근무 시간]\n"
-                            for j in center_jobs:
-                                if j.get('work_hours'):
-                                    work_hours_info += f"- {j['title']}: {j.get('work_hours', '')}\n"
-                        
-                        commute_prompt = f"""
-당신은 한국 출퇴근 경로 안내 전문가입니다.
-4가지 교통수단별 출퇴근 가이드를 작성하세요.
-
-[출발지] {start_address}
-[도착지 센터]
+                        tip_prompt = f"""
+출발지: {start_address}
+도착지: {selected_center['name']}
+센터 정보:
 {center_info}
-{work_hours_info}
+선택 교통수단: {transport_kr}
 
-[중요: 반드시 아래 JSON 형식으로만 응답하세요]
+위 정보 기반으로 이 교통수단으로 출퇴근할 때의 꿀팁을 정리해주세요.
+정확한 시간이나 거리는 언급하지 마세요.
 
-{{
-  "summary": {{
-    "car_time": "약 45분",
-    "transit_time": "약 1시간 10분",
-    "bicycle_time": "약 2시간",
-    "walk_time": "약 5시간"
-  }},
-  "car": {{
-    "duration": "약 45분 (교통상황에 따라 다름)",
-    "route": "주요 경로 설명",
-    "parking": "주차 정보 (긍정적으로)"
-  }},
-  "transit": {{
-    "duration": "약 1시간 10분",
-    "departure": "출발지에서 정류장까지 안내",
-    "route": "환승 경로 자세히"
-  }},
-  "bicycle": {{
-    "duration": "약 2시간",
-    "route": "자전거 경로 또는 한강 자전거도로 활용 안내",
-    "note": "긍정적인 참고사항 (운동 효과, 경치 좋은 코스 등)"
-  }},
-  "walk": {{
-    "duration": "약 5시간 30분",
-    "route": "도보 경로",
-    "note": "긍정적인 안내 (걷기 좋은 구간 등)"
-  }},
-  "recommended_departure": "출발 권장 시간 안내 (근무시간 정보 없으면 빈 문자열)"
-}}
+[작성 형식]
+🎯 {transport_kr} 출퇴근 꿀팁
 
-[매우 중요한 규칙]
-- "비추천", "어렵다", "힘들다" 같은 부정적인 표현 절대 금지
-- 거리가 멀어도 긍정적이고 지지하는 톤으로 작성
-- 예: "장거리지만 운동 삼아 도전해보면 색다른 경험!", "한강 자전거도로로 멋진 출근길 가능!", "건강한 라이프스타일에 도움" 등
-- 응원하고 지원하는 따뜻한 어투
-- 모든 시간은 "약 X분" 또는 "약 X시간 X분" 형식
-- JSON 외 다른 텍스트 절대 금지
+✨ 추천 포인트
+- (장점/매력 포인트 2-3가지, 긍정적으로)
+
+💡 실용 팁
+- (주차/환승/준비물 등 실용 정보)
+
+⚠️ 알아두면 좋은 점
+- (러시아워 회피, 날씨 영향 등)
+
+[규칙]
+- 정확한 시간이나 거리 언급 절대 금지
+- 긍정적이고 응원하는 톤
+- 짧고 핵심만
+- 마크다운 사용
 """
                         
                         response = client.chat.completions.create(
                             model="gpt-4o-mini",
                             messages=[
-                                {"role": "system", "content": "당신은 친절하고 긍정적인 출퇴근 경로 안내 전문가입니다. 항상 응원하는 톤으로 답변하며 JSON으로만 응답합니다."},
-                                {"role": "user", "content": commute_prompt}
+                                {"role": "system", "content": "당신은 친근한 출퇴근 꿀팁 전문가입니다."},
+                                {"role": "user", "content": tip_prompt}
                             ],
                             temperature=0.6,
-                            max_tokens=800,
-                            response_format={"type": "json_object"},
+                            max_tokens=400,
                         )
                         
-                        ai_answer = response.choices[0].message.content
-                        st.session_state['commute_result'] = ai_answer
-                        st.session_state['commute_start'] = start_address
-                        st.session_state['commute_center'] = selected_center
+                        st.session_state['commute_tip'] = response.choices[0].message.content
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"분석 중 오류가 발생했어요: {e}")
+                        st.error(f"오류: {e}")
+            
+            if st.session_state.get('commute_tip'):
+                st.markdown(st.session_state['commute_tip'])
+                
+                if st.button("🔄 다시 보기", use_container_width=True, key="reset_tip"):
+                    del st.session_state['commute_tip']
+                    st.rerun()
         else:
             st.info("👆 출발지를 먼저 입력해주세요!")
-        
-        # 결과 표시
-        if st.session_state.get('commute_result'):
-            try:
-                result = json.loads(st.session_state['commute_result'])
-                saved_start = st.session_state.get('commute_start', start_address)
-                saved_center = st.session_state.get('commute_center', selected_center)
-                
-                st.markdown("---")
-                
-                # 출발/도착 카드
-                ROUTE_HEADER = (
-                    '<div style="background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); '
-                    'padding: 1rem; border-radius: 14px; text-align: center; '
-                    'border: 1px solid rgba(66, 133, 244, 0.15); margin-bottom: 12px;">'
-                    f'<div style="font-size: 0.85rem; color: #1E40AF; font-weight: 600;">🏠 {saved_start}</div>'
-                    '<div style="margin: 0.3rem 0; color: #4285F4;">⬇️</div>'
-                    f'<div style="font-weight: 700; color: #1E3A8A; font-size: 1rem;">🏢 {saved_center["name"]}</div>'
-                    '</div>'
-                )
-                st.html(ROUTE_HEADER)
-                
-                # 4가지 교통수단 그리드 (요약 - 항상 표시)
-                summary = result.get('summary', {})
-                
-                # 선택된 교통수단 강조
-                def grid_item(key, emoji, label, time_text):
-                    is_selected = (key == sel_transport)
-                    if is_selected:
-                        return (
-                            '<div style="background: white; border: 2px solid #4285F4; border-radius: 12px; '
-                            'padding: 10px 4px; text-align: center; box-shadow: 0 3px 8px rgba(66, 133, 244, 0.2);">'
-                            f'<div style="font-size: 1.4rem;">{emoji}</div>'
-                            f'<div style="font-size: 0.7rem; color: #1E40AF; font-weight: 700; margin-top: 2px;">{label}</div>'
-                            f'<div style="font-size: 0.78rem; font-weight: 800; color: #2563EB; margin-top: 2px;">{time_text}</div>'
-                            '</div>'
-                        )
-                    else:
-                        return (
-                            '<div style="background: white; border: 2px solid #DBEAFE; border-radius: 12px; '
-                            'padding: 10px 4px; text-align: center;">'
-                            f'<div style="font-size: 1.4rem;">{emoji}</div>'
-                            f'<div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 2px;">{label}</div>'
-                            f'<div style="font-size: 0.78rem; font-weight: 700; color: #475569; margin-top: 2px;">{time_text}</div>'
-                            '</div>'
-                        )
-                
-                SUMMARY_HTML = (
-                    '<div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 14px;">'
-                    + grid_item("car", "🚗", "자동차", summary.get("car_time", "-"))
-                    + grid_item("transit", "🚇", "대중교통", summary.get("transit_time", "-"))
-                    + grid_item("bicycle", "🚴", "자전거", summary.get("bicycle_time", "-"))
-                    + grid_item("walk", "🚶", "도보", summary.get("walk_time", "-"))
-                    + '</div>'
-                )
-                st.html(SUMMARY_HTML)
-                
-                # 선택된 교통수단만 상세 카드 표시
-                if sel_transport == "car":
-                    car = result.get('car', {})
-                    CAR_CARD = (
-                        '<div style="background: white; padding: 14px 16px; border-radius: 14px; '
-                        'border: 2px solid #DBEAFE; margin-bottom: 8px; box-shadow: 0 3px 10px rgba(66, 133, 244, 0.1);">'
-                        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">'
-                        '<span style="font-size: 1.5rem;">🚗</span>'
-                        '<span style="font-size: 1.05rem; font-weight: 800; color: #1E3A8A;">자동차로 출근하기</span>'
-                        f'<span style="background: #DBEAFE; color: #1E40AF; font-size: 0.72rem; '
-                        'padding: 3px 10px; border-radius: 10px; font-weight: 700; margin-left: auto;">'
-                        f'{car.get("duration", "")}</span>'
-                        '</div>'
-                        '<div style="font-size: 0.85rem; color: #475569; line-height: 1.9;">'
-                        f'<b style="color: #1E3A8A;">📍 경로:</b><br>{car.get("route", "")}<br><br>'
-                        f'<b style="color: #1E3A8A;">🅿️ 주차:</b><br>{car.get("parking", "")}'
-                        '</div></div>'
-                    )
-                    st.html(CAR_CARD)
-                
-                elif sel_transport == "transit":
-                    transit = result.get('transit', {})
-                    TRANSIT_CARD = (
-                        '<div style="background: white; padding: 14px 16px; border-radius: 14px; '
-                        'border: 2px solid #BBF7D0; margin-bottom: 8px; box-shadow: 0 3px 10px rgba(34, 197, 94, 0.1);">'
-                        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">'
-                        '<span style="font-size: 1.5rem;">🚇</span>'
-                        '<span style="font-size: 1.05rem; font-weight: 800; color: #166534;">대중교통으로 출근하기</span>'
-                        f'<span style="background: #DCFCE7; color: #166534; font-size: 0.72rem; '
-                        'padding: 3px 10px; border-radius: 10px; font-weight: 700; margin-left: auto;">'
-                        f'{transit.get("duration", "")}</span>'
-                        '</div>'
-                        '<div style="font-size: 0.85rem; color: #475569; line-height: 1.9;">'
-                        f'<b style="color: #166534;">🚏 출발:</b><br>{transit.get("departure", "")}<br><br>'
-                        f'<b style="color: #166534;">🚌 경로:</b><br>{transit.get("route", "")}'
-                        '</div></div>'
-                    )
-                    st.html(TRANSIT_CARD)
-                
-                elif sel_transport == "bicycle":
-                    bicycle = result.get('bicycle', {})
-                    BICYCLE_CARD = (
-                        '<div style="background: white; padding: 14px 16px; border-radius: 14px; '
-                        'border: 2px solid #FCD34D; margin-bottom: 8px; box-shadow: 0 3px 10px rgba(245, 158, 11, 0.1);">'
-                        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">'
-                        '<span style="font-size: 1.5rem;">🚴</span>'
-                        '<span style="font-size: 1.05rem; font-weight: 800; color: #92400E;">자전거로 출근하기</span>'
-                        f'<span style="background: #FEF3C7; color: #92400E; font-size: 0.72rem; '
-                        'padding: 3px 10px; border-radius: 10px; font-weight: 700; margin-left: auto;">'
-                        f'{bicycle.get("duration", "")}</span>'
-                        '</div>'
-                        '<div style="font-size: 0.85rem; color: #475569; line-height: 1.9;">'
-                        f'<b style="color: #92400E;">🚲 경로:</b><br>{bicycle.get("route", "")}<br><br>'
-                        f'<b style="color: #92400E;">💡 안내:</b><br>{bicycle.get("note", "")}'
-                        '</div></div>'
-                    )
-                    st.html(BICYCLE_CARD)
-                
-                elif sel_transport == "walk":
-                    walk = result.get('walk', {})
-                    WALK_CARD = (
-                        '<div style="background: white; padding: 14px 16px; border-radius: 14px; '
-                        'border: 2px solid #F9A8D4; margin-bottom: 8px; box-shadow: 0 3px 10px rgba(236, 72, 153, 0.1);">'
-                        '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">'
-                        '<span style="font-size: 1.5rem;">🚶</span>'
-                        '<span style="font-size: 1.05rem; font-weight: 800; color: #831843;">도보로 출근하기</span>'
-                        f'<span style="background: #FCE7F3; color: #831843; font-size: 0.72rem; '
-                        'padding: 3px 10px; border-radius: 10px; font-weight: 700; margin-left: auto;">'
-                        f'{walk.get("duration", "")}</span>'
-                        '</div>'
-                        '<div style="font-size: 0.85rem; color: #475569; line-height: 1.9;">'
-                        f'<b style="color: #831843;">👣 경로:</b><br>{walk.get("route", "")}<br><br>'
-                        f'<b style="color: #831843;">💡 안내:</b><br>{walk.get("note", "")}'
-                        '</div></div>'
-                    )
-                    st.html(WALK_CARD)
-                
-                # 권장 출발 시간
-                recommended = result.get('recommended_departure', '')
-                if recommended:
-                    REC_CARD = (
-                        '<div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); '
-                        'padding: 14px 16px; border-radius: 14px; '
-                        'border: 1px solid rgba(251, 191, 36, 0.3); margin-top: 12px;">'
-                        '<div style="font-size: 0.85rem; font-weight: 700; color: #92400E; margin-bottom: 6px;">⏰ 출근 권장 출발 시간</div>'
-                        f'<div style="font-size: 0.85rem; color: #78350F; line-height: 1.7;">{recommended}</div>'
-                        '</div>'
-                    )
-                    st.html(REC_CARD)
-                
-                st.markdown("<br>", unsafe_allow_html=True)
-                st.caption("💡 더 정확한 실시간 정보는 네이버 지도에서 확인하세요")
-                
-                # 네이버지도 링크만
-                end_enc = urllib.parse.quote(saved_center['address'])
-                naver_modes = {
-                    "car": "car",
-                    "transit": "transit",
-                    "bicycle": "bicycle",
-                    "walk": "walk"
-                }
-                naver_mode = naver_modes.get(sel_transport, "transit")
-                naver_url = f"https://map.naver.com/p/directions/-/{end_enc}/{naver_mode}"
-                
-                st.link_button("🗺️ 네이버지도에서 길찾기", naver_url, use_container_width=True, type="primary")
-                
-                if st.button("🔄 새로 분석하기", use_container_width=True, key="reanalyze"):
-                    del st.session_state['commute_result']
-                    st.rerun()
-            
-            except json.JSONDecodeError:
-                st.error("결과를 불러오는 중 오류가 발생했어요. 다시 시도해주세요.")
-                if st.button("🔄 다시 시도", use_container_width=True):
-                    del st.session_state['commute_result']
-                    st.rerun()
 
 
 # ============================================
@@ -1092,15 +915,17 @@ elif st.session_state.active_tab == "contact":
         phone_clean = manager_phone.replace('-', '')
         st.link_button(f"{manager_phone}", f"tel:{phone_clean}", use_container_width=True)
 
-# FAQ
+# 컴팩트 FAQ
 faqs = get_faq_items()
 if faqs:
-    st.html('<div class="section-header">💡 자주 묻는 질문</div>')
-    for faq in faqs[:5]:
+    st.html('<div class="compact-header">💡 자주 묻는 질문</div>')
+    st.html('<div class="compact-faq">')
+    for faq in faqs[:3]:
         with st.expander(f"❓ {faq.get('question', '')}"):
-            st.write(faq.get('answer', ''))
+            st.caption(faq.get('answer', ''))
+    st.html('</div>')
 
-# 주의사항
+# 채용 안내 (작고 연하게)
 notice_text = settings.get('notice_text', '')
 if notice_text:
     formatted_notice = notice_text.replace('※ ', '<br>※ ').replace('• ', '<br>• ').strip()
@@ -1109,11 +934,11 @@ if notice_text:
     
     NOTICE_HTML = (
         '<div style="background: transparent; border-top: 1px solid #F1F5F9; '
-        'padding: 1rem 0.5rem 0.5rem; margin: 1.5rem 0 0.5rem; '
-        'color: #94A3B8; font-size: 0.7rem; line-height: 1.7; font-weight: 400;">'
-        '<div style="font-weight: 600; font-size: 0.72rem; color: #94A3B8; margin-bottom: 0.5rem;">'
+        'padding: 0.8rem 0.5rem 0.3rem; margin: 1rem 0 0.3rem; '
+        'color: #CBD5E1; font-size: 0.62rem; line-height: 1.5; font-weight: 400;">'
+        '<div style="font-weight: 600; font-size: 0.65rem; color: #CBD5E1; margin-bottom: 0.3rem;">'
         '채용 안내</div>'
-        f'<div style="color: #94A3B8;">{formatted_notice}</div>'
+        f'<div style="color: #CBD5E1;">{formatted_notice}</div>'
         '</div>'
     )
     st.html(NOTICE_HTML)
@@ -1121,10 +946,7 @@ if notice_text:
 # 푸터
 FOOTER_HTML = (
     '<div class="footer">'
-    '💬 궁금한 점은 AI 상담사가 24시간 답변해드립니다<br>'
-    f'📞 {manager_name} · {manager_phone}<br>'
-    '<br>'
-    '© 윌앤비전 채용팀'
+    f'📞 {manager_name} · {manager_phone} · © 윌앤비전 채용팀'
     '</div>'
 )
 st.html(FOOTER_HTML)
