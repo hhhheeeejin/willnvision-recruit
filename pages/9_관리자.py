@@ -40,6 +40,115 @@ check_password()
 st.title("🔐 윌앤비전 채용 관리자")
 st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
+# ============ 다음 우편번호 API 컴포넌트 함수 ============
+def daum_postcode_widget(target_key="addr_search_result", height=400):
+    """
+    다음 우편번호 검색 위젯
+    target_key: 결과를 저장할 session_state 키
+    """
+    postcode_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: 'Pretendard', sans-serif; margin: 0; padding: 10px; background: white; }}
+            .container {{ max-width: 100%; }}
+            .search-btn {{
+                background: linear-gradient(135deg, #4285F4, #2563EB);
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 10px;
+                font-weight: 700;
+                font-size: 14px;
+                cursor: pointer;
+                width: 100%;
+                margin-bottom: 10px;
+            }}
+            .search-btn:hover {{
+                background: linear-gradient(135deg, #2563EB, #1E40AF);
+            }}
+            .result-box {{
+                background: #F1F5F9;
+                padding: 12px;
+                border-radius: 10px;
+                margin-top: 10px;
+                font-size: 13px;
+                color: #1E293B;
+                line-height: 1.6;
+                display: none;
+            }}
+            .result-box.show {{ display: block; }}
+            .result-label {{ font-weight: 700; color: #1E40AF; margin-bottom: 4px; }}
+            .copy-info {{
+                background: #FEF3C7;
+                padding: 10px;
+                border-radius: 8px;
+                margin-top: 10px;
+                font-size: 12px;
+                color: #92400E;
+                line-height: 1.5;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <button class="search-btn" onclick="execDaumPostcode()">
+                🔍 주소 검색하기 (다음 우편번호 API)
+            </button>
+            
+            <div id="result" class="result-box">
+                <div class="result-label">📍 검색 결과</div>
+                <div id="postcode"></div>
+                <div id="address"></div>
+                <div id="extraAddress"></div>
+                <div class="copy-info">
+                    💡 위 주소를 아래 입력 칸에 복사·붙여넣기 하세요!
+                </div>
+            </div>
+        </div>
+
+        <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+        <script>
+            function execDaumPostcode() {{
+                new daum.Postcode({{
+                    oncomplete: function(data) {{
+                        var addr = '';
+                        var extraAddr = '';
+                        
+                        if (data.userSelectedType === 'R') {{
+                            addr = data.roadAddress;
+                        }} else {{
+                            addr = data.jibunAddress;
+                        }}
+                        
+                        if (data.userSelectedType === 'R') {{
+                            if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {{
+                                extraAddr += data.bname;
+                            }}
+                            if (data.buildingName !== '' && data.apartment === 'Y') {{
+                                extraAddr += (extraAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+                            }}
+                            if (extraAddr !== '') {{
+                                extraAddr = ' (' + extraAddr + ')';
+                            }}
+                        }}
+                        
+                        document.getElementById('postcode').innerHTML = '<b>우편번호:</b> ' + data.zonecode;
+                        document.getElementById('address').innerHTML = '<b>주소:</b> ' + addr + extraAddr;
+                        document.getElementById('extraAddress').innerHTML = '<b>참고:</b> ' + (data.buildingName || '없음');
+                        document.getElementById('result').classList.add('show');
+                    }}
+                }}).open();
+            }}
+        </script>
+    </body>
+    </html>
+    """
+    return postcode_html
+
+
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 대시보드",
     "📋 공고 관리",
@@ -109,12 +218,11 @@ with tab1:
         st.caption("AI가 답변 못한 질문들. 💬 대화기록 탭에서 확인하세요.")
 
 # =============================================================
-# TAB 2: 공고 관리 (이미지 업로드 추가)
+# TAB 2: 공고 관리
 # =============================================================
 with tab2:
     st.subheader("📋 공고 관리")
     
-    # ============ 새 공고 추가 ============
     with st.expander("➕ 새 공고 추가하기"):
         
         active_centers = get_active_centers()
@@ -125,7 +233,7 @@ with tab2:
                 options=list(center_options.keys()),
                 format_func=lambda x: center_options[x],
                 key="new_job_center_select",
-                help="등록된 센터에서 선택. 선택하면 주소/지하철 정보가 자동으로 채워집니다."
+                help="등록된 센터에서 선택"
             )
             
             selected_center = next((c for c in active_centers if c['id'] == new_center_id), None)
@@ -140,9 +248,8 @@ with tab2:
         else:
             new_center_id = None
             selected_center = None
-            st.warning("⚠️ 등록된 센터가 없습니다. '🏢 센터 관리' 탭에서 먼저 센터를 추가해주세요.")
+            st.warning("⚠️ 등록된 센터가 없습니다. '🏢 센터 관리' 탭에서 먼저 추가하세요.")
         
-        # 🖼️ 이미지 업로드 (폼 밖에서)
         st.markdown("**🖼️ 공고 이미지 (선택)**")
         st.caption("공고 카드 펼치면 상단에 표시됩니다. 1MB 이하 권장")
         
@@ -161,7 +268,6 @@ with tab2:
                 "이미지 선택", 
                 type=["png", "jpg", "jpeg", "gif", "webp"],
                 key="new_img_upload",
-                help="PNG, JPG, JPEG, GIF, WebP 지원"
             )
             if uploaded_file_temp:
                 st.image(uploaded_file_temp, width=300, caption="✅ 미리보기")
@@ -175,7 +281,7 @@ with tab2:
                 try:
                     st.image(new_image_url_temp, width=300, caption="✅ 미리보기")
                 except Exception:
-                    st.warning("⚠️ URL이 잘못되었거나 이미지를 불러올 수 없어요.")
+                    st.warning("⚠️ URL 오류")
         
         with st.form("new_job_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
@@ -199,37 +305,35 @@ with tab2:
                 
                 default_location = f"{default_subway_station} 인근" if default_subway_station else selected_center.get('address', '')[:20]
             
-            st.caption("💡 센터 기반으로 자동 채워졌습니다. 필요시 수정하세요.")
+            st.caption("💡 센터 기반 자동 채워짐")
             
             col1, col2, col3 = st.columns(3)
-            new_subway_line = col1.text_input("지하철 노선", value=default_subway_line, placeholder="예: 2호선")
-            new_subway_station = col2.text_input("지하철역", value=default_subway_station, placeholder="예: 문래역")
-            new_location = col3.text_input("근무지 상세", value=default_location, placeholder="예: 문래역 인근")
+            new_subway_line = col1.text_input("지하철 노선", value=default_subway_line)
+            new_subway_station = col2.text_input("지하철역", value=default_subway_station)
+            new_location = col3.text_input("근무지 상세", value=default_location)
             
             col1, col2 = st.columns(2)
             new_salary = col1.text_input("급여 *", placeholder="예: 월 250만원")
             new_hours = col2.text_input("근무시간", placeholder="예: 09-18시")
             
             col1, col2 = st.columns(2)
-            new_days = col1.text_input("근무요일", placeholder="예: 월-금 (주5일)")
-            new_education = col2.text_input("교육 일정", placeholder="예: 5/1부터 3일간")
+            new_days = col1.text_input("근무요일", placeholder="예: 월-금")
+            new_education = col2.text_input("교육 일정", placeholder="예: 5/1부터 5일")
             
-            new_features = st.text_input("특징", placeholder="예: 신입가능, 주말휴무")
-            new_description = st.text_area("상세 설명", placeholder="업무 내용 등")
+            new_features = st.text_input("특징", placeholder="예: 신입가능")
+            new_description = st.text_area("상세 설명")
             
             col1, col2 = st.columns(2)
-            new_form_url = col1.text_input("구글폼 URL", placeholder="https://forms.gle/...")
-            new_chat_url = col2.text_input("오픈채팅 URL", placeholder="https://open.kakao.com/...")
+            new_form_url = col1.text_input("구글폼 URL")
+            new_chat_url = col2.text_input("오픈채팅 URL")
             
-            # 🌐 외부 채용 사이트
             st.markdown("**🌐 외부 채용 사이트 (선택)**")
-            st.caption("알바몬, 잡코리아 등에 공고 올린 경우 링크 추가")
             col1, col2 = st.columns([1, 2])
             new_external_site = col1.text_input("사이트명", placeholder="예: 알바몬")
-            new_external_url = col2.text_input("URL", placeholder="https://www.albamon.com/...")
+            new_external_url = col2.text_input("URL", placeholder="https://...")
             
             new_status = st.selectbox("상태", ["모집중", "마감", "재오픈예정"])
-            new_order = st.number_input("표시 순서 (작을수록 위)", min_value=0, value=99)
+            new_order = st.number_input("표시 순서", min_value=0, value=99)
             
             submitted = st.form_submit_button("💾 공고 등록", type="primary", use_container_width=True)
             
@@ -239,7 +343,6 @@ with tab2:
                 elif not new_center_id:
                     st.error("근무 센터를 선택해주세요.")
                 else:
-                    # 이미지 처리
                     final_image_url = ""
                     if img_method == "📁 파일 업로드" and uploaded_file_temp:
                         with st.spinner("이미지 업로드 중..."):
@@ -247,8 +350,6 @@ with tab2:
                             uploaded_url = upload_image(file_bytes, uploaded_file_temp.name)
                             if uploaded_url:
                                 final_image_url = uploaded_url
-                            else:
-                                st.warning("⚠️ 이미지 업로드 실패, 공고만 등록합니다.")
                     elif img_method == "🔗 URL 입력" and new_image_url_temp:
                         final_image_url = new_image_url_temp
                     
@@ -282,7 +383,6 @@ with tab2:
     
     st.divider()
     
-    # ============ 등록된 공고 목록 ============
     st.markdown("### 📋 등록된 공고 목록")
     jobs = get_all_jobs()
     
@@ -292,13 +392,11 @@ with tab2:
         for job in jobs:
             with st.expander(f"**{job['title']}** — {job['status']}", expanded=False):
                 
-                # 🖼️ 현재 이미지 미리보기 (폼 밖)
                 current_image = job.get('image_url') or ""
                 if current_image:
                     st.markdown("**🖼️ 현재 이미지**")
                     st.image(current_image, width=200)
                 
-                # 이미지 변경 라디오 (폼 밖)
                 st.markdown("**🖼️ 이미지 작업**")
                 img_action = st.radio(
                     "이미지 작업",
@@ -318,7 +416,7 @@ with tab2:
                         key=f"upload_{job['id']}"
                     )
                     if new_upload_file:
-                        st.image(new_upload_file, width=200, caption="✅ 새 이미지 미리보기")
+                        st.image(new_upload_file, width=200)
                 elif img_action == "🔗 URL 변경":
                     new_image_url_input = st.text_input(
                         "새 이미지 URL",
@@ -373,19 +471,16 @@ with tab2:
                     ed_form_url = col1.text_input("구글폼 URL", value=job.get('google_form_url') or "", key=f"job_form_{job['id']}")
                     ed_chat_url = col2.text_input("오픈채팅 URL", value=job.get('open_chat_url') or "", key=f"job_chat_{job['id']}")
                     
-                    # 🌐 외부 채용 사이트
                     st.markdown("**🌐 외부 채용 사이트 (선택)**")
                     col1, col2 = st.columns([1, 2])
                     ed_external_site = col1.text_input(
                         "사이트명", 
                         value=job.get('external_site_name') or "",
-                        placeholder="예: 알바몬",
                         key=f"job_ext_site_{job['id']}"
                     )
                     ed_external_url = col2.text_input(
                         "URL", 
                         value=job.get('external_url') or "",
-                        placeholder="https://...",
                         key=f"job_ext_url_{job['id']}"
                     )
                     
@@ -403,15 +498,12 @@ with tab2:
                     delete_btn = col3.form_submit_button("🗑️ 삭제", use_container_width=True)
                     
                     if save_btn:
-                        # 이미지 처리
                         final_image = current_image
                         if img_action == "📁 새 파일 업로드" and new_upload_file:
                             with st.spinner("이미지 업로드 중..."):
                                 uploaded_url = upload_image(new_upload_file.getvalue(), new_upload_file.name)
                                 if uploaded_url:
                                     final_image = uploaded_url
-                                else:
-                                    st.warning("⚠️ 이미지 업로드 실패, 기존 이미지 유지")
                         elif img_action == "🔗 URL 변경":
                             final_image = new_image_url_input
                         elif img_action == "🗑️ 삭제":
@@ -454,19 +546,35 @@ with tab2:
                             st.error(f"삭제 실패: {e}")
 
 # =============================================================
-# TAB 3: 센터 관리
+# TAB 3: 센터 관리 (다음 우편번호 API 추가!)
 # =============================================================
 with tab3:
     st.subheader("🏢 센터 관리")
     st.caption("근무지(센터) 정보를 관리하고, 센터별 FAQ를 등록하세요.")
     
     with st.expander("➕ 새 센터 추가"):
+        
+        # 🔍 다음 우편번호 검색 (폼 밖)
+        st.markdown("**🔍 주소 검색 (다음 우편번호 API)**")
+        st.caption("정확한 주소를 검색해서 아래 입력 칸에 복사·붙여넣기 하세요!")
+        
+        st.components.v1.html(daum_postcode_widget(), height=350)
+        
+        st.markdown("---")
+        
         with st.form("new_center_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             nc_name = col1.text_input("센터 이름 *", placeholder="예: 윌앤비전 강남센터")
             nc_phone = col2.text_input("대표 연락처", placeholder="02-XXX-XXXX")
             
-            nc_address = st.text_input("주소 *", placeholder="예: 서울특별시 강남구 테헤란로 123")
+            col1, col2 = st.columns([2, 1])
+            nc_address = col1.text_input(
+                "주소 *", 
+                placeholder="예: 서울특별시 강남구 강남대로 123",
+                help="🔍 위 '주소 검색하기' 버튼으로 검색 후 복사해서 붙여넣기"
+            )
+            nc_zonecode = col2.text_input("우편번호", placeholder="12345")
+            
             nc_detail = st.text_input("상세 안내", placeholder="예: XX빌딩 5층, 역에서 도보 3분")
             
             col1, col2 = st.columns(2)
@@ -493,9 +601,13 @@ with tab3:
                     st.error("센터 이름과 주소는 필수입니다.")
                 else:
                     try:
+                        full_address = nc_address
+                        if nc_zonecode:
+                            full_address = f"[{nc_zonecode}] {nc_address}"
+                        
                         create_center({
                             "name": nc_name,
-                            "address": nc_address,
+                            "address": full_address,
                             "detail_address": nc_detail,
                             "phone": nc_phone,
                             "subway_info": nc_subway,
@@ -523,12 +635,23 @@ with tab3:
             status_badge = "🟢 활성" if c.get('is_active') else "⚫ 비활성"
             with st.expander(f"**{c['name']}** — {status_badge}", expanded=False):
                 
+                # 🔍 수정 시에도 주소 검색 가능
+                st.markdown("**🔍 주소 검색 (수정 시 사용)**")
+                st.caption("필요시 주소를 다시 검색할 수 있어요")
+                with st.expander("🗺️ 주소 검색 열기"):
+                    st.components.v1.html(daum_postcode_widget(target_key=f"addr_search_{c['id']}"), height=350)
+                
                 with st.form(f"edit_center_{c['id']}"):
                     col1, col2 = st.columns(2)
                     ec_name = col1.text_input("이름", value=c['name'], key=f"ctr_name_{c['id']}")
                     ec_phone = col2.text_input("연락처", value=c.get('phone') or "", key=f"ctr_phone_{c['id']}")
                     
-                    ec_address = st.text_input("주소", value=c['address'], key=f"ctr_addr_{c['id']}")
+                    ec_address = st.text_input(
+                        "주소", 
+                        value=c['address'], 
+                        help="🔍 위 '주소 검색 열기'에서 검색 후 복사해서 붙여넣기",
+                        key=f"ctr_addr_{c['id']}"
+                    )
                     ec_detail = st.text_input("상세 안내", value=c.get('detail_address') or "", key=f"ctr_detail_{c['id']}")
                     
                     col1, col2 = st.columns(2)
@@ -544,10 +667,8 @@ with tab3:
 - 위치: 문래역 5번 출구 도보 3분
 - 휴게실: 3층 (자판기, 전자레인지)
 - 주차: 건물 뒤 3대 (선착순)
-- 분위기: 편안하고 수평적, 평균 30대
-- 점심: 1층 구내식당 or 근처 맛집""",
+- 분위기: 편안하고 수평적""",
                         height=180,
-                        help="💡 이 내용을 바탕으로 AI 챗봇이 센터 관련 질문에 답변합니다",
                         key=f"ctr_info_{c['id']}"
                     )
                     
@@ -586,7 +707,7 @@ with tab3:
                             st.success("🗑️ 삭제됨")
                             st.rerun()
                         except Exception as e:
-                            st.error(f"실패: {e}. 이 센터에 연결된 공고가 있을 수 있어요.")
+                            st.error(f"실패: {e}")
                 
                 # 센터별 FAQ
                 st.markdown("---")
@@ -596,7 +717,7 @@ with tab3:
                 with st.expander("➕ FAQ 추가"):
                     with st.form(f"new_cfaq_{c['id']}", clear_on_submit=True):
                         cfaq_q = st.text_input("질문", placeholder="예: 주차 가능해요?", key=f"ncf_q_{c['id']}")
-                        cfaq_a = st.text_area("답변", placeholder="예: 건물 뒤쪽에 3대 가능합니다", key=f"ncf_a_{c['id']}")
+                        cfaq_a = st.text_area("답변", placeholder="예: 건물 뒤쪽에 3대 가능", key=f"ncf_a_{c['id']}")
                         cfaq_order = st.number_input("표시 순서", min_value=0, value=99, key=f"ncf_ord_{c['id']}")
                         
                         if st.form_submit_button("💾 등록", type="primary", use_container_width=True):
@@ -613,8 +734,6 @@ with tab3:
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"실패: {e}")
-                            else:
-                                st.error("질문과 답변을 입력해주세요.")
                 
                 center_faqs_list = get_all_center_faqs(c['id'])
                 if center_faqs_list:
@@ -651,20 +770,19 @@ with tab3:
                                             "is_active": new_active,
                                         })
                                         st.session_state[f"edit_cfaq_{cfaq['id']}"] = False
-                                        st.success("저장됨!")
                                         st.rerun()
                                     if sc2.form_submit_button("취소", use_container_width=True):
                                         st.session_state[f"edit_cfaq_{cfaq['id']}"] = False
                                         st.rerun()
                 else:
-                    st.caption("💡 등록된 FAQ가 없습니다. 위에서 추가해보세요.")
+                    st.caption("💡 등록된 FAQ가 없습니다.")
 
 # =============================================================
 # TAB 4: FAQ 관리
 # =============================================================
 with tab4:
     st.subheader("❓ 공통 FAQ 관리")
-    st.caption("모든 센터에 해당하는 공통 질문-답변을 관리하세요. 센터별 FAQ는 '🏢 센터 관리'에서!")
+    st.caption("모든 센터에 해당하는 공통 질문-답변. 센터별 FAQ는 '🏢 센터 관리'에서!")
     
     with st.expander("➕ 새 FAQ 추가"):
         with st.form("new_faq_form", clear_on_submit=True):
@@ -672,8 +790,8 @@ with tab4:
             new_category = col1.selectbox("카테고리", ["회사소개", "담당자", "지원방법", "근무조건", "기타"])
             new_order = col2.number_input("표시 순서", min_value=0, value=99)
             
-            new_question = st.text_input("질문 *", placeholder="예: 재택근무 가능한가요?")
-            new_answer = st.text_area("답변 *", placeholder="답변을 입력하세요")
+            new_question = st.text_input("질문 *", placeholder="예: 재택근무 가능?")
+            new_answer = st.text_area("답변 *")
             
             col1, col2 = st.columns(2)
             new_show_faq = col1.checkbox("메인 FAQ에 표시", value=True)
@@ -705,7 +823,7 @@ with tab4:
         st.info("등록된 FAQ가 없습니다.")
     else:
         for item in kb_items:
-            with st.expander(f"**[{item.get('category', '기타')}]** {item.get('question', '(질문 없음)')[:40]}..."):
+            with st.expander(f"**[{item.get('category', '기타')}]** {item.get('question', '')[:40]}..."):
                 with st.form(f"edit_faq_{item['id']}"):
                     ed_q = st.text_input("질문", value=item.get('question') or "", key=f"faq_q_{item['id']}")
                     ed_a = st.text_area("답변", value=item.get('answer') or "", key=f"faq_a_{item['id']}")
@@ -748,7 +866,6 @@ with tab4:
 # =============================================================
 with tab5:
     st.subheader("⚙️ 사이트 설정")
-    st.caption("첫화면 문구, 담당자 정보, 챗봇 멘트, 주의사항 등을 편집합니다.")
     
     settings = get_site_settings()
     
@@ -756,9 +873,9 @@ with tab5:
         st.markdown("### 🎨 메인 페이지")
         col1, col2 = st.columns([1, 3])
         new_emoji = col1.text_input("대표 이모지", value=settings.get('hero_emoji', '🤖'))
-        new_title = col2.text_input("헤드라인 제목", value=settings.get('hero_title', ''))
+        new_title = col2.text_input("헤드라인", value=settings.get('hero_title', ''))
         new_subtitle = st.text_input("서브타이틀", value=settings.get('hero_subtitle', ''))
-        new_hero_img = st.text_input("상단 이미지 URL (선택)", value=settings.get('hero_image_url', ''))
+        new_hero_img = st.text_input("상단 이미지 URL", value=settings.get('hero_image_url', ''))
         new_intro = st.text_area("회사 소개", value=settings.get('company_intro', ''))
         
         st.divider()
@@ -766,19 +883,12 @@ with tab5:
         col1, col2 = st.columns(2)
         new_m_name = col1.text_input("담당자 이름", value=settings.get('manager_name', ''))
         new_m_phone = col2.text_input("담당자 전화번호", value=settings.get('manager_phone', ''))
-        new_m_email = st.text_input("담당자 이메일 (선택)", value=settings.get('manager_email', ''))
+        new_m_email = st.text_input("담당자 이메일", value=settings.get('manager_email', ''))
         
         st.divider()
         st.markdown("### 🔗 외부 링크")
-        new_default_form = st.text_input(
-            "기본 구글폼 URL",
-            value=settings.get('default_google_form_url', ''),
-            help="공고별 구글폼이 없을 때 사용"
-        )
-        new_openchat = st.text_input(
-            "카카오 오픈채팅 URL",
-            value=settings.get('kakao_openchat_url', ''),
-        )
+        new_default_form = st.text_input("기본 구글폼 URL", value=settings.get('default_google_form_url', ''))
+        new_openchat = st.text_input("카카오 오픈채팅 URL", value=settings.get('kakao_openchat_url', ''))
         
         st.divider()
         st.markdown("### 🗺️ 기본 사무실 위치")
@@ -786,55 +896,36 @@ with tab5:
         
         st.divider()
         st.markdown("### 🛡️ 채용 주의사항")
-        st.caption("홈 화면 하단에 표시되는 채용 안내 문구입니다. ※ 마다 자동 줄바꿈됩니다.")
         new_notice = st.text_area(
             "주의사항 문구",
             value=settings.get('notice_text', ''),
-            placeholder="예: 본 채용은 학력/연령/성별 차별 없이 진행됩니다...",
             height=120,
         )
         
         st.divider()
         st.markdown("### 🤖 챗봇 설정")
-        st.caption("챗봇 이름, 인사말, 추천 질문 등을 자유롭게 변경하세요!")
         
         col1, col2 = st.columns([1, 3])
         new_bot_emoji = col1.text_input("챗봇 이모지", value=settings.get('chatbot_emoji', '🤖'))
         new_bot_name = col2.text_input("챗봇 이름", value=settings.get('chatbot_name', '윌비봇'))
         
-        new_greeting = st.text_input(
-            "메인 인사말",
-            value=settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 물어보세요"),
-        )
-        new_sub_greeting = st.text_input(
-            "서브 인사말",
-            value=settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!'),
-        )
+        new_greeting = st.text_input("메인 인사말", value=settings.get('chatbot_greeting', ''))
+        new_sub_greeting = st.text_input("서브 인사말", value=settings.get('chatbot_sub_greeting', ''))
         
         col1, col2 = st.columns(2)
-        new_placeholder = col1.text_input(
-            "입력창 안내",
-            value=settings.get('chatbot_placeholder', '편하게 질문 주세요...'),
-        )
-        new_empty_msg = col2.text_input(
-            "빈 대화 문구",
-            value=settings.get('chatbot_empty_msg', '대화를 시작해주세요!'),
-        )
+        new_placeholder = col1.text_input("입력창 안내", value=settings.get('chatbot_placeholder', ''))
+        new_empty_msg = col2.text_input("빈 대화 문구", value=settings.get('chatbot_empty_msg', ''))
         
-        new_thinking_msg = st.text_input(
-            "답변 대기 문구",
-            value=settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요...'),
-        )
+        new_thinking_msg = st.text_input("답변 대기 문구", value=settings.get('chatbot_thinking_msg', ''))
         
-        st.markdown("**💡 추천 질문 (챗봇 시작 시 표시)**")
+        st.markdown("**💡 추천 질문**")
         col1, col2 = st.columns(2)
-        new_sug_q1 = col1.text_input("추천 질문 1", value=settings.get('suggested_q_1', '신입도 가능해요?'))
-        new_sug_q2 = col2.text_input("추천 질문 2", value=settings.get('suggested_q_2', '나에게 맞는 채용은?'))
+        new_sug_q1 = col1.text_input("추천 질문 1", value=settings.get('suggested_q_1', ''))
+        new_sug_q2 = col2.text_input("추천 질문 2", value=settings.get('suggested_q_2', ''))
         col1, col2 = st.columns(2)
-        new_sug_q3 = col1.text_input("추천 질문 3", value=settings.get('suggested_q_3', '급여 얼마에요?'))
-        new_sug_q4 = col2.text_input("추천 질문 4", value=settings.get('suggested_q_4', '교육 기간은?'))
+        new_sug_q3 = col1.text_input("추천 질문 3", value=settings.get('suggested_q_3', ''))
+        new_sug_q4 = col2.text_input("추천 질문 4", value=settings.get('suggested_q_4', ''))
         
-        st.markdown("**🎭 말투 & 동작**")
         new_tone = st.selectbox(
             "말투 스타일",
             ["friendly", "casual", "formal"],
@@ -912,7 +1003,7 @@ with tab6:
             "담당자필요": "✅" if c['needs_human'] else "",
         } for c in conversations])
         
-        show_only_needs_human = st.checkbox("⚠️ 담당자 연결 필요한 것만 보기")
+        show_only_needs_human = st.checkbox("⚠️ 담당자 연결 필요한 것만")
         if show_only_needs_human:
             df = df[df['담당자필요'] == '✅']
         
