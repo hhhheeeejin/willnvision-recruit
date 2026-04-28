@@ -11,6 +11,7 @@ from utils.db import (
     get_all_centers, create_center, update_center, delete_center, get_active_centers,
     get_all_center_faqs, create_center_faq, update_center_faq, delete_center_faq,
     upload_image, delete_image,
+    get_commute_stats, get_commute_region_stats,
 )
 
 st.set_page_config(page_title="관리자", page_icon="🔐", layout="wide")
@@ -212,11 +213,68 @@ with tab1:
         else:
             st.info("아직 데이터가 없습니다.")
     
-    with col2:
+   with col2:
         st.subheader("⚠️ 담당자 연결 필요")
         st.metric("담당자 연결 요청", f"{stats['needs_human_count']:,}건")
         st.caption("AI가 답변 못한 질문들. 💬 대화기록 탭에서 확인하세요.")
-
+    
+    # 🎯 출근거리 지역 통계 (NEW!)
+    st.divider()
+    st.subheader("🚇 출근거리 검색 지역 통계")
+    st.caption("어느 지역에서 채용 문의가 많은지 추정 가능해요!")
+    
+    region_stats = get_commute_region_stats()
+    
+    if region_stats:
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown("**📊 지역별 검색 수 (TOP 10)**")
+            for i, (region, count) in enumerate(region_stats[:10], 1):
+                # 비율 계산
+                total = sum(c for _, c in region_stats)
+                pct = (count / total * 100) if total > 0 else 0
+                
+                # 막대 그래프
+                bar_width = min(pct * 3, 100)
+                BAR_HTML = (
+                    f'<div style="margin-bottom: 8px;">'
+                    f'<div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 4px;">'
+                    f'<span style="font-weight: 600;">{i}. {region}</span>'
+                    f'<span style="color: #475569;">{count}회 ({pct:.1f}%)</span>'
+                    f'</div>'
+                    f'<div style="background: #E2E8F0; border-radius: 6px; height: 8px; overflow: hidden;">'
+                    f'<div style="background: linear-gradient(90deg, #4285F4, #2563EB); '
+                    f'width: {bar_width}%; height: 100%; border-radius: 6px;"></div>'
+                    f'</div></div>'
+                )
+                st.html(BAR_HTML)
+        
+        with col2:
+            st.metric("총 검색 수", f"{sum(c for _, c in region_stats):,}건")
+            st.metric("지역 수", f"{len(region_stats)}개")
+            
+            # 가장 많은 지역
+            if region_stats:
+                top_region, top_count = region_stats[0]
+                st.metric("🏆 1위 지역", top_region, f"{top_count}회")
+        
+        # 상세 데이터
+        with st.expander("📋 상세 검색 기록 보기"):
+            commute_data = get_commute_stats()
+            if commute_data:
+                import pandas as pd
+                df_commute = pd.DataFrame([{
+                    "시간": c['created_at'][:19].replace('T', ' '),
+                    "출발지": c['start_address'],
+                    "지역": c.get('region', '기타'),
+                    "도착 센터": c.get('center_name', ''),
+                    "교통수단": c.get('transport_type', ''),
+                } for c in commute_data])
+                st.dataframe(df_commute, use_container_width=True, hide_index=True)
+    else:
+        st.info("아직 출근거리 검색 기록이 없습니다.")
+        
 # =============================================================
 # TAB 2: 공고 관리
 # =============================================================
