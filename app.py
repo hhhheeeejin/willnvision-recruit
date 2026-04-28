@@ -8,9 +8,9 @@ from utils.db import (
     increment_job_view, increment_job_apply, get_site_settings,
     get_active_jobs, get_knowledge_base, save_conversation,
     get_active_centers, get_center_faqs,
+    save_commute_search,
 )
 
-# 페이지 설정
 st.set_page_config(
     page_title="윌앤비전 채용",
     page_icon="📞",
@@ -30,14 +30,12 @@ if "from_job_card" not in st.session_state:
 if "messages_history" not in st.session_state:
     st.session_state.messages_history = []
 
-# ==================================================
-# 데이터 한 번만 로드 (캐싱 효과)
-# ==================================================
-@st.cache_data(ttl=180)  # 3분 캐시
+# 데이터 캐싱
+@st.cache_data(ttl=180)
 def load_settings():
     return get_site_settings()
 
-@st.cache_data(ttl=120)  # 2분 캐시
+@st.cache_data(ttl=120)
 def load_active_jobs_with_center():
     return get_active_jobs_with_center()
 
@@ -62,36 +60,25 @@ bot_greeting = settings.get('chatbot_greeting', "궁금한 건 윌비봇에게 �
 bot_sub = settings.get('chatbot_sub_greeting', '24시간 친절하게 답변드려요!')
 bot_placeholder = settings.get('chatbot_placeholder', '편하게 질문 주세요...')
 bot_empty = settings.get('chatbot_empty_msg', '대화를 시작해주세요!')
-bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요...willviwillvi 띠리띠리-')
+bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에요...')
 
-# OpenAI
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# 페이지 최상단 강제 스크롤
-st.html("""
-<script>
-(function() {
-    const scrollToTop = () => {
-        const main = window.parent.document.querySelector('section.main');
-        if (main) {
-            main.scrollTo({top: 0, behavior: 'instant'});
-        }
-        window.scrollTo(0, 0);
-    };
-    scrollToTop();
-    setTimeout(scrollToTop, 100);
-    setTimeout(scrollToTop, 300);
-})();
-</script>
-""")
+# ❌ 자동 스크롤 제거 (요청 4번: 액션 후 그 자리 유지)
+# 페이지가 마음대로 위/아래로 안 가도록!
 
-# CSS - 가볍고 깔끔하게
+# CSS - 깔끔 + 버튼 크기 통일
 CUSTOM_CSS = """
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/variable/pretendardvariable.css" rel="stylesheet">
 <style>
 html, body, [class*="css"] {
     font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif !important;
     letter-spacing: -0.4px;
+}
+
+/* Streamlit 자동 스크롤 비활성화 */
+section.main {
+    scroll-behavior: auto !important;
 }
 
 .block-container {
@@ -101,7 +88,7 @@ html, body, [class*="css"] {
     background: white !important;
 }
 
-/* 히어로 (더 작게!) */
+/* 히어로 (작게) */
 .hero-section {
     text-align: center;
     padding: 1.6rem 1.2rem 1.4rem;
@@ -211,15 +198,24 @@ html, body, [class*="css"] {
     border-radius: 10px !important; margin: 6px 0 !important;
 }
 
-/* 기능 탭 버튼 (이모지 없이 한글만, 가시성 강화) */
+/* 🎯 모든 버튼 크기 통일 */
 .stButton > button {
     border-radius: 12px !important;
     font-weight: 700 !important;
     border: 2px solid transparent !important;
     transition: all 0.2s !important;
     letter-spacing: -0.3px !important;
-    padding: 0.6rem 0.8rem !important;
-    font-size: 0.9rem !important;
+    padding: 0.65rem 0.5rem !important;
+    font-size: 0.88rem !important;
+    height: 44px !important;        /* 높이 통일 */
+    min-height: 44px !important;
+    width: 100% !important;          /* 너비 100% */
+    white-space: nowrap !important;  /* 줄바꿈 방지 */
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 .stButton > button[kind="primary"] {
@@ -233,7 +229,6 @@ html, body, [class*="css"] {
     transform: translateY(-1px);
 }
 
-/* 다크모드에서도 secondary 버튼 가시성 보장 */
 .stButton > button[kind="secondary"] {
     background: white !important;
     color: #1E40AF !important;
@@ -247,10 +242,19 @@ html, body, [class*="css"] {
     color: #1E40AF !important;
 }
 
+/* 🎯 LinkButton도 같은 크기 */
 .stLinkButton > a > button {
     border-radius: 12px !important;
     font-weight: 700 !important;
-    font-size: 0.9rem !important;
+    font-size: 0.88rem !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    width: 100% !important;
+    padding: 0.65rem 0.5rem !important;
+    white-space: nowrap !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
 .stLinkButton > a > button[kind="secondary"] {
@@ -273,7 +277,6 @@ html, body, [class*="css"] {
     color: #1E293B !important;
 }
 
-/* 챗봇 인사 박스 (작게) */
 .cute-greeting {
     background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
     border-radius: 18px;
@@ -333,51 +336,51 @@ html, body, [class*="css"] {
     .hero-emoji { font-size: 2rem; }
     .hero-title { font-size: 1.25rem; }
     .section-header { font-size: 1rem; }
-    .stButton > button { font-size: 0.85rem !important; padding: 0.55rem 0.6rem !important; }
+    .stButton > button { 
+        font-size: 0.78rem !important; 
+        padding: 0.55rem 0.4rem !important;
+        height: 42px !important;
+        min-height: 42px !important;
+    }
+    .stLinkButton > a > button {
+        font-size: 0.78rem !important;
+        padding: 0.55rem 0.4rem !important;
+        height: 42px !important;
+        min-height: 42px !important;
+    }
 }
 
-/* 다크모드에서도 흰 배경 + 진한 글씨 + 버튼 가시성 강제 */
 @media (prefers-color-scheme: dark) {
     .stApp { background: white !important; }
     .block-container { background: white !important; }
-    
     [data-testid="stExpander"] { background: white !important; }
     [data-testid="stExpander"] summary,
     [data-testid="stExpander"] summary p { color: #1E3A8A !important; }
-    
     .stMarkdown p, .stMarkdown li,
     [data-testid="stMarkdownContainer"] p,
     [data-testid="stMarkdownContainer"] li,
     [data-testid="stMarkdownContainer"] span { color: #1E293B !important; }
-    
     .section-header { color: #1E40AF !important; }
     .cute-greeting-title { color: #1E40AF !important; }
     .cute-greeting-sub { color: #3B82F6 !important; }
-    
     [data-testid="stCaptionContainer"],
     [data-testid="stCaptionContainer"] p { color: #475569 !important; }
-    
     [data-testid="stChatMessage"] { background: #F8FAFC !important; }
     [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p { color: #1E293B !important; }
-    
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea {
         background: white !important; color: #1E293B !important;
     }
-    
-    /* 다크모드에서도 secondary 버튼 명확히 보이게 */
     .stButton > button[kind="secondary"] {
         background: white !important;
         color: #1E40AF !important;
         border: 2px solid #BFDBFE !important;
     }
-    
     .stLinkButton > a > button[kind="secondary"] {
         background: white !important;
         color: #1E40AF !important;
         border: 2px solid #BFDBFE !important;
     }
-    
     .footer { color: #94A3B8 !important; }
 }
 </style>
@@ -409,8 +412,8 @@ if not jobs:
 else:
     for idx, job in enumerate(jobs):
         status_emoji = "🟢" if job['status'] == '모집중' else ("🟡" if job['status'] == '재오픈예정' else "⚫")
-        # 첫 번째 공고만 자동 펼침
-        with st.expander(f"{status_emoji} **{job['title']}**", expanded=(idx == 0)):
+        # 🎯 항상 닫힌 상태 (자동 펼침 X)
+        with st.expander(f"{status_emoji} **{job['title']}**", expanded=False):
             if job.get('image_url'):
                 st.image(job['image_url'], use_container_width=True)
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -478,7 +481,7 @@ else:
                 else:
                     st.button("지원 준비중", key=f"apply_{job['id']}", use_container_width=True, disabled=True)
 
-# 기능 탭 (이모지 없이 한글만!)
+# 기능 탭
 st.html('<div class="section-header">기능 선택</div>')
 
 tab_cols = st.columns(4)
@@ -591,8 +594,8 @@ if st.session_state.active_tab == "chat":
             f"4. 개인정보 수집 금지\n\n"
             f"[출퇴근 시간 질문]\n"
             f"'○○에서 ○○까지 얼마나 걸려?' 같은 질문 받으면:\n"
-            f"1. 한국 지리 기반 대략적 시간 안내 (예: 약 30~40분)\n"
-            f"2. 4가지 교통수단 중 적합한 것 2~3개 추천\n"
+            f"1. 한국 지리 기반 대략적 시간 안내\n"
+            f"2. 4가지 교통수단 중 적합한 것 추천\n"
             f"3. 답변 끝에: '💡 정확한 시간은 카카오맵·네이버지도에서 확인 가능! 하단 \"출근거리\" 메뉴에서 바로 길찾기 됩니다.'"
         )
     
@@ -630,7 +633,6 @@ if st.session_state.active_tab == "chat":
                     st.session_state.preset_question = q
                     st.rerun()
     
-    # 챗봇 창 280px (350px → 280px)
     chat_container = st.container(border=True, height=280)
     with chat_container:
         if not st.session_state.messages:
@@ -676,7 +678,6 @@ if st.session_state.active_tab == "chat":
     
     if st.session_state.messages:
         col1, col2, col3 = st.columns(3)
-        
         with col1:
             if st.session_state.messages_history and st.session_state.messages_history != st.session_state.messages:
                 if st.button("↶ 이전", use_container_width=True, key="restore_during"):
@@ -684,11 +685,9 @@ if st.session_state.active_tab == "chat":
                     st.rerun()
             else:
                 st.empty()
-        
         with col2:
             if default_form_url:
                 st.link_button("지원하기", default_form_url, use_container_width=True, type="primary")
-        
         with col3:
             if st.button("새 대화", use_container_width=True):
                 if st.session_state.messages:
@@ -698,7 +697,7 @@ if st.session_state.active_tab == "chat":
 
 
 # ============================================
-# 탭 2: 출근 거리
+# 탭 2: 출근 거리 (지역 통계 수집!)
 # ============================================
 elif st.session_state.active_tab == "distance":
     st.markdown("#### 🚇 출근 경로 확인")
@@ -717,7 +716,7 @@ elif st.session_state.active_tab == "distance":
     st.markdown("**출발지 입력**")
     start_address = st.text_input(
         "출발지",
-        placeholder="예: 영등포구 당산로41길 11, 문래역",
+        placeholder="예: 고양시 호수로 336, 강남역",
         label_visibility="collapsed",
         key="start_addr",
     )
@@ -800,6 +799,15 @@ elif st.session_state.active_tab == "distance":
                          key="check_time_btn"):
                 with st.spinner("분석 중... 🔍"):
                     try:
+                        # 🎯 5번: 지역 통계 데이터 저장!
+                        save_commute_search(
+                            session_id=st.session_state.session_id,
+                            start_address=start_address,
+                            center_id=selected_center['id'],
+                            center_name=selected_center['name'],
+                            transport_type=sel_transport,
+                        )
+                        
                         time_prompt = f"""
 출발지: {start_address}
 도착지: {selected_center['name']} ({selected_center.get('address', '')})
@@ -964,7 +972,7 @@ elif st.session_state.active_tab == "contact":
         phone_clean = manager_phone.replace('-', '')
         st.link_button(f"{manager_phone}", f"tel:{phone_clean}", use_container_width=True)
 
-# 채용 안내 (유지, 작게)
+# 채용 안내 (유지)
 notice_text = settings.get('notice_text', '')
 if notice_text:
     formatted_notice = notice_text.replace('※ ', '<br>※ ').replace('• ', '<br>• ').strip()
@@ -982,7 +990,6 @@ if notice_text:
     )
     st.html(NOTICE_HTML)
 
-# 푸터 (1줄)
 FOOTER_HTML = (
     '<div class="footer">'
     f'📞 {manager_name} · {manager_phone} · © 윌앤비전 채용팀'
