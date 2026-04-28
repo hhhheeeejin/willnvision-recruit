@@ -536,7 +536,7 @@ st.html('<div class="section-header">기능 선택</div>')
 tab_cols = st.columns(4)
 
 with tab_cols[0]:
-    if st.button("윌비봇상담", key="tab_chat", use_container_width=True,
+    if st.button("윌비상담", key="tab_chat", use_container_width=True,
                  type="primary" if st.session_state.active_tab == "chat" else "secondary"):
         st.session_state.active_tab = "chat"
         st.session_state.from_job_card = False
