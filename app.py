@@ -512,7 +512,7 @@ else:
             
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("이 공고 문의", key=f"chat_{job['id']}", use_container_width=True):
+                if st.button("윌비봇 채용문의", key=f"chat_{job['id']}", use_container_width=True):
                     st.session_state['preset_question'] = f"{job['title']} 공고에 대해 알려주세요"
                     st.session_state['preset_job_id'] = job['id']
                     st.session_state.active_tab = "chat"
@@ -522,7 +522,7 @@ else:
             with col2:
                 apply_url = job.get('google_form_url') or default_form_url
                 if apply_url:
-                    if st.button("지원하기", key=f"apply_{job['id']}", use_container_width=True, type="primary"):
+                    if st.button("간편지원하기", key=f"apply_{job['id']}", use_container_width=True, type="primary"):
                         increment_job_apply(job['id'], st.session_state.session_id)
                         st.markdown(f'<meta http-equiv="refresh" content="0; url={apply_url}">', unsafe_allow_html=True)
                         st.success("지원 페이지로 이동 중...")
