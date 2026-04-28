@@ -608,7 +608,7 @@ if st.session_state.active_tab == "chat":
                     st.session_state.preset_question = q
                     st.rerun()
     
-    chat_container = st.container(border=True, height=280)
+    chat_container = st.container(border=True, height=230)
     with chat_container:
         if not st.session_state.messages:
             st.caption(bot_empty)
@@ -692,7 +692,7 @@ elif st.session_state.active_tab == "distance":
     st.markdown("**출발지 입력**")
     start_address = st.text_input(
         "출발지",
-        placeholder="예: 고양시 호수로 336, 강남역",
+        placeholder="예: 영등포구 당산로41길 11, 당산역",
         label_visibility="collapsed",
         key="start_addr",
     )
