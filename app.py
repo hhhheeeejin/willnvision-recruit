@@ -198,63 +198,85 @@ section.main {
     border-radius: 10px !important; margin: 6px 0 !important;
 }
 
-/* 🎯 모든 버튼 크기 통일 */
-.stButton > button {
+/* 🎯 모든 버튼 크기 통일 (강제) */
+.stButton, .stLinkButton {
+    height: 44px !important;
+}
+
+.stButton > button,
+.stLinkButton > a,
+.stLinkButton > a > button {
     border-radius: 12px !important;
     font-weight: 700 !important;
     border: 2px solid transparent !important;
     transition: all 0.2s !important;
     letter-spacing: -0.3px !important;
-    padding: 0.65rem 0.5rem !important;
+    padding: 0 0.5rem !important;
     font-size: 0.88rem !important;
-    height: 44px !important;        /* 높이 통일 */
+    height: 44px !important;
     min-height: 44px !important;
-    width: 100% !important;          /* 너비 100% */
-    white-space: nowrap !important;  /* 줄바꿈 방지 */
+    max-height: 44px !important;
+    width: 100% !important;
+    white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;
 }
 
-.stButton > button[kind="primary"] {
+/* LinkButton의 a 태그 자체도 강제 */
+.stLinkButton > a {
+    text-decoration: none !important;
+    display: block !important;
+}
+
+/* Primary 버튼 */
+.stButton > button[kind="primary"],
+.stLinkButton > a > button[kind="primary"] {
     background: linear-gradient(135deg, #4285F4 0%, #2563EB 100%) !important;
     color: white !important;
+    border: 2px solid transparent !important;
     box-shadow: 0 3px 8px rgba(66, 133, 244, 0.3) !important;
 }
 
-.stButton > button[kind="primary"]:hover {
+.stButton > button[kind="primary"]:hover,
+.stLinkButton > a > button[kind="primary"]:hover {
     background: linear-gradient(135deg, #2563EB 0%, #1E40AF 100%) !important;
     transform: translateY(-1px);
 }
 
-.stButton > button[kind="secondary"] {
+/* Secondary 버튼 */
+.stButton > button[kind="secondary"],
+.stLinkButton > a > button[kind="secondary"] {
     background: white !important;
     color: #1E40AF !important;
     border: 2px solid #BFDBFE !important;
     font-weight: 700 !important;
 }
 
-.stButton > button[kind="secondary"]:hover {
+.stButton > button[kind="secondary"]:hover,
+.stLinkButton > a > button[kind="secondary"]:hover {
     background: #EFF6FF !important;
     border-color: #4285F4 !important;
     color: #1E40AF !important;
 }
 
-/* 🎯 LinkButton도 같은 크기 */
-.stLinkButton > a > button {
-    border-radius: 12px !important;
-    font-weight: 700 !important;
-    font-size: 0.88rem !important;
-    height: 44px !important;
-    min-height: 44px !important;
-    width: 100% !important;
-    padding: 0.65rem 0.5rem !important;
-    white-space: nowrap !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
+/* 지원하기 버튼 (LinkButton primary - 초록) */
+.stLinkButton > a > button[kind="primary"][data-baseweb="button"] {
+    background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+}
+
+/* 모든 버튼 내부 텍스트 정렬 */
+.stButton > button > div,
+.stLinkButton > a > button > div,
+.stButton > button p,
+.stLinkButton > a > button p {
+    margin: 0 !important;
+    padding: 0 !important;
+    line-height: 1 !important;
 }
 
 .stLinkButton > a > button[kind="secondary"] {
@@ -336,17 +358,19 @@ section.main {
     .hero-emoji { font-size: 2rem; }
     .hero-title { font-size: 1.25rem; }
     .section-header { font-size: 1rem; }
-    .stButton > button { 
-        font-size: 0.78rem !important; 
-        padding: 0.55rem 0.4rem !important;
+    
+    .stButton, .stLinkButton {
         height: 42px !important;
-        min-height: 42px !important;
     }
-    .stLinkButton > a > button {
-        font-size: 0.78rem !important;
-        padding: 0.55rem 0.4rem !important;
+    
+    .stButton > button,
+    .stLinkButton > a,
+    .stLinkButton > a > button { 
+        font-size: 0.78rem !important; 
+        padding: 0 0.4rem !important;
         height: 42px !important;
         min-height: 42px !important;
+        max-height: 42px !important;
     }
 }
 
