@@ -350,3 +350,93 @@ def delete_image(url):
         return True
     except Exception:
         return False
+
+# ============ 출근거리 검색 기록 ============
+
+def save_commute_search(session_id, start_address, center_id, center_name, transport_type):
+    """출근거리 검색 기록 저장 (지역 자동 추출)"""
+    try:
+        # 출발지 주소에서 지역 추출 (간단한 룰 기반)
+        region = extract_region(start_address)
+        
+        sb = get_supabase()
+        sb.table("commute_searches").insert({
+            "session_id": session_id,
+            "start_address": start_address,
+            "center_id": center_id,
+            "center_name": center_name,
+            "transport_type": transport_type,
+            "region": region,
+        }).execute()
+        return True
+    except Exception as e:
+        print(f"출근거리 기록 저장 실패: {e}")
+        return False
+
+
+def extract_region(address):
+    """주소에서 지역 추출 (예: '서울', '경기', '인천')"""
+    if not address:
+        return "기타"
+    
+    addr = address.strip()
+    
+    # 광역시/도 매칭
+    region_map = {
+        '서울': ['서울', '강남', '강북', '마포', '용산', '종로', '성동', '광진', '동대문',
+                '중랑', '성북', '도봉', '노원', '은평', '서대문', '양천', '강서', '구로',
+                '금천', '영등포', '동작', '관악', '서초', '송파', '강동', '중구',
+                '홍대', '신촌', '잠실', '여의도', '문래', '당산'],
+        '경기': ['경기', '고양', '성남', '수원', '용인', '안양', '안산', '부천', '광명',
+                '평택', '시흥', '김포', '광주', '의정부', '하남', '구리', '남양주', '오산',
+                '이천', '안성', '의왕', '양주', '동두천', '과천', '여주', '포천', '연천',
+                '가평', '양평', '화성', '파주', '군포'],
+        '인천': ['인천', '부평', '계양', '연수', '남동', '서구', '중구', '강화', '옹진'],
+        '부산': ['부산', '해운대', '수영', '동래', '연제', '부산진', '남구', '북구',
+                '사하', '사상', '강서', '금정', '기장'],
+        '대구': ['대구', '달서', '달성', '수성'],
+        '광주': ['광주광역시'],
+        '대전': ['대전', '유성', '서구', '중구', '동구', '대덕'],
+        '울산': ['울산', '북구', '남구', '동구', '중구', '울주'],
+        '세종': ['세종'],
+        '강원': ['강원', '춘천', '원주', '강릉', '동해', '태백', '속초', '삼척'],
+        '충청': ['충청', '천안', '청주', '아산', '서산', '당진', '공주', '보령'],
+        '전라': ['전라', '전주', '익산', '군산', '목포', '여수', '순천'],
+        '경상': ['경상', '포항', '경주', '안동', '구미', '영주', '경산', '진주', '통영'],
+        '제주': ['제주'],
+    }
+    
+    for region, keywords in region_map.items():
+        for kw in keywords:
+            if kw in addr:
+                return region
+    
+    return "기타"
+
+
+def get_commute_stats():
+    """출근거리 검색 통계 (관리자용)"""
+    try:
+        sb = get_supabase_admin()
+        res = sb.table("commute_searches").select("*").order("created_at", desc=True).execute()
+        return res.data or []
+    except Exception as e:
+        print(f"출근거리 통계 조회 실패: {e}")
+        return []
+
+
+def get_commute_region_stats():
+    """지역별 검색 통계 집계"""
+    try:
+        searches = get_commute_stats()
+        region_count = {}
+        for s in searches:
+            region = s.get('region', '기타')
+            region_count[region] = region_count.get(region, 0) + 1
+        
+        # 정렬: 많은 순
+        sorted_regions = sorted(region_count.items(), key=lambda x: x[1], reverse=True)
+        return sorted_regions
+    except Exception as e:
+        print(f"지역 통계 실패: {e}")
+        return []
