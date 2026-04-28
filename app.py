@@ -700,7 +700,7 @@ if st.session_state.active_tab == "chat":
 
 
 # ============================================
-# 탭 2: 출근 거리
+# 탭 2: 출근 거리 (시간 + 꿀팁 통합)
 # ============================================
 elif st.session_state.active_tab == "distance":
     st.markdown("#### 🚇 출근 경로 확인")
@@ -710,10 +710,8 @@ elif st.session_state.active_tab == "distance":
         'padding: 0.9rem 1rem; border-radius: 12px; margin-bottom: 1rem; '
         'border: 1px solid rgba(66, 133, 244, 0.15);">'
         '<div style="font-size: 0.82rem; color: #1E40AF; font-weight: 600; line-height: 1.7;">'
-        '✨ <b>3단계로 정확한 출퇴근 정보 확인하기</b><br>'
-        '1️⃣ 집 주소 입력 (또는 빠른 선택)<br>'
-        '2️⃣ 도착지 센터 선택<br>'
-        '3️⃣ 길찾기 버튼 클릭 → 카카오맵/네이버지도에서 정확한 시간 확인!'
+        '✨ <b>3단계로 출퇴근 정보 확인</b><br>'
+        '1️⃣ 집 주소 입력 → 2️⃣ 도착지 센터 선택 → 3️⃣ 시간 확인 버튼 클릭!'
         '</div></div>'
     )
     st.html(GUIDE_BOX)
@@ -733,6 +731,9 @@ elif st.session_state.active_tab == "distance":
         with quick_cols[idx]:
             if st.button(loc, key=f"qa_{idx}", use_container_width=True):
                 st.session_state['start_addr'] = loc
+                # 출발지 바뀌면 이전 결과 초기화
+                if 'commute_analysis' in st.session_state:
+                    del st.session_state['commute_analysis']
                 st.rerun()
     
     st.markdown("<br>", unsafe_allow_html=True)
@@ -748,6 +749,7 @@ elif st.session_state.active_tab == "distance":
             st.info(f"🏢 **{selected_center['name']}** — {selected_center['address']}")
             sel_id = selected_center['id']
         else:
+            prev_sel_id = st.session_state.get('dest_center')
             sel_id = st.radio(
                 "도착지 센터",
                 options=list(c_opts.keys()),
@@ -755,11 +757,16 @@ elif st.session_state.active_tab == "distance":
                 key="dest_center",
                 label_visibility="collapsed"
             )
+            # 센터 바뀌면 이전 결과 초기화
+            if prev_sel_id != sel_id and 'commute_analysis' in st.session_state:
+                del st.session_state['commute_analysis']
+            
             selected_center = next(c for c in centers if c['id'] == sel_id)
         
         if start_address:
             st.markdown("<br>", unsafe_allow_html=True)
             
+            # 출발/도착 카드
             ROUTE_HEADER = (
                 '<div style="background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); '
                 'padding: 1rem; border-radius: 14px; text-align: center; '
@@ -771,6 +778,7 @@ elif st.session_state.active_tab == "distance":
             )
             st.html(ROUTE_HEADER)
             
+            # 교통수단 선택
             st.markdown("**🚏 교통수단 선택**")
             
             sel_transport = st.session_state.get('sel_transport', 'transit')
@@ -792,114 +800,153 @@ elif st.session_state.active_tab == "distance":
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            start_enc = urllib.parse.quote(start_address)
-            end_enc = urllib.parse.quote(selected_center['address'])
-            
-            kakao_url = f"https://map.kakao.com/?sName={start_enc}&eName={end_enc}"
-            
-            naver_modes = {
-                "car": "car",
-                "transit": "transit",
-                "bicycle": "bicycle",
-                "walk": "walk"
-            }
-            naver_mode = naver_modes.get(sel_transport, "transit")
-            naver_url = f"https://map.naver.com/p/directions/-/{end_enc}/{naver_mode}"
-            
-            BIG_BUTTON_INFO = (
-                '<div style="background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%); '
-                'padding: 14px 16px; border-radius: 14px; '
-                'border: 1px solid rgba(34, 197, 94, 0.3); margin-bottom: 12px;">'
-                '<div style="font-size: 0.85rem; font-weight: 700; color: #166534; margin-bottom: 4px;">'
-                '🗺️ 정확한 길찾기 결과 확인'
-                '</div>'
-                '<div style="font-size: 0.78rem; color: #166534; line-height: 1.6;">'
-                '아래 버튼을 누르면 실시간 교통상황이 반영된 정확한 시간·거리·경로를 확인할 수 있어요!'
-                '</div></div>'
-            )
-            st.html(BIG_BUTTON_INFO)
-            
-            col1, col2 = st.columns(2)
-            with col1:
-                st.link_button("🗺️ 카카오맵 길찾기", kakao_url, type="primary", use_container_width=True)
-            with col2:
-                st.link_button("🗺️ 네이버지도 길찾기", naver_url, use_container_width=True)
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            
-            st.markdown("---")
-            st.markdown("##### 🤖 AI에게 추가 정보 물어보기")
-            st.caption("주차·환승·꿀팁 등 실용 정보를 AI가 알려드려요")
-            
-            transport_kr_map = {"car": "자동차", "transit": "대중교통", "bicycle": "자전거", "walk": "도보"}
-            transport_kr = transport_kr_map.get(sel_transport, "교통수단")
-            
-            if st.button(f"💡 {transport_kr} 출퇴근 꿀팁 보기", 
-                         use_container_width=True, key="ask_ai_tip"):
-                with st.spinner("AI가 꿀팁을 정리 중이에요... 🔍"):
+            # ⏱️ 시간 확인 버튼 (핵심!)
+            if st.button("⏱️ 시간 확인하기 (AI 분석)", 
+                         type="primary", 
+                         use_container_width=True, 
+                         key="check_time_btn"):
+                with st.spinner("윌비가 출퇴근 정보 분석 중이에요... 🔍"):
                     try:
                         center_info = (
                             f"센터명: {selected_center['name']}\n"
                             f"주소: {selected_center.get('address', '')}\n"
                             f"지하철: {selected_center.get('subway_info', '')}\n"
-                            f"버스: {selected_center.get('bus_info', '')}\n"
-                            f"주차: {'가능' if selected_center.get('parking_available') else '확인 필요'}\n"
                         )
                         
-                        tip_prompt = f"""
+                        time_prompt = f"""
 출발지: {start_address}
-도착지: {selected_center['name']}
-센터 정보:
-{center_info}
-선택 교통수단: {transport_kr}
+도착지: {selected_center['name']} ({selected_center.get('address', '')})
 
-위 정보 기반으로 이 교통수단으로 출퇴근할 때의 꿀팁을 정리해주세요.
-정확한 시간이나 거리는 언급하지 마세요.
+위 출발지에서 도착지까지의 4가지 교통수단별 예상 소요시간을 알려주세요.
+한국 지리 기반으로 합리적인 추정값을 제공하세요.
 
-[작성 형식]
-🎯 {transport_kr} 출퇴근 꿀팁
+[중요: 반드시 아래 JSON 형식으로만 응답]
 
-✨ 추천 포인트
-- (장점/매력 포인트 2-3가지, 긍정적으로)
-
-💡 실용 팁
-- (주차/환승/준비물 등 실용 정보)
-
-⚠️ 알아두면 좋은 점
-- (러시아워 회피, 날씨 영향 등)
+{{
+  "car": "약 35분",
+  "transit": "약 45분",
+  "bicycle": "약 1시간 20분",
+  "walk": "약 2시간 30분",
+  "tip": "꿀팁 한 문장만 (예: 2호선 한 번으로 환승 없이 이동 가능해요!)"
+}}
 
 [규칙]
-- 정확한 시간이나 거리 언급 절대 금지
+- 시간 형식: "약 X분" 또는 "약 X시간 X분"
+- 꿀팁은 정말 짧게 1문장 (50자 이내)
 - 긍정적이고 응원하는 톤
-- 짧고 핵심만
-- 마크다운 사용
+- JSON 외 다른 텍스트 절대 금지
 """
                         
                         response = client.chat.completions.create(
                             model="gpt-4o-mini",
                             messages=[
-                                {"role": "system", "content": "당신은 친근한 출퇴근 꿀팁 전문가입니다."},
-                                {"role": "user", "content": tip_prompt}
+                                {"role": "system", "content": "당신은 한국 출퇴근 경로 안내 전문가입니다. JSON으로만 응답합니다."},
+                                {"role": "user", "content": time_prompt}
                             ],
-                            temperature=0.6,
-                            max_tokens=400,
+                            temperature=0.5,
+                            max_tokens=300,
+                            response_format={"type": "json_object"},
                         )
                         
-                        st.session_state['commute_tip'] = response.choices[0].message.content
+                        st.session_state['commute_analysis'] = response.choices[0].message.content
+                        st.session_state['commute_start'] = start_address
+                        st.session_state['commute_center_name'] = selected_center['name']
+                        st.session_state['commute_center_addr'] = selected_center['address']
                         st.rerun()
                         
                     except Exception as e:
-                        st.error(f"오류: {e}")
+                        st.error(f"분석 중 오류: {e}")
             
-            if st.session_state.get('commute_tip'):
-                st.markdown(st.session_state['commute_tip'])
-                
-                if st.button("🔄 다시 보기", use_container_width=True, key="reset_tip"):
-                    del st.session_state['commute_tip']
+            # 결과 표시
+            if st.session_state.get('commute_analysis'):
+                try:
+                    result = json.loads(st.session_state['commute_analysis'])
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.markdown("##### ⏱️ 예상 소요시간")
+                    
+                    # 4가지 교통수단 시간 카드 (선택된 것 강조)
+                    def time_card(key, emoji, label, time_text):
+                        is_selected = (key == sel_transport)
+                        if is_selected:
+                            return (
+                                '<div style="background: linear-gradient(135deg, #4285F4 0%, #2563EB 100%); '
+                                'border-radius: 12px; padding: 12px; text-align: center; '
+                                'box-shadow: 0 4px 12px rgba(66, 133, 244, 0.3);">'
+                                f'<div style="font-size: 1.4rem;">{emoji}</div>'
+                                f'<div style="font-size: 0.72rem; color: rgba(255,255,255,0.9); font-weight: 600; margin-top: 2px;">{label}</div>'
+                                f'<div style="font-size: 1rem; font-weight: 800; color: white; margin-top: 4px;">{time_text}</div>'
+                                '</div>'
+                            )
+                        else:
+                            return (
+                                '<div style="background: white; border: 2px solid #DBEAFE; '
+                                'border-radius: 12px; padding: 12px; text-align: center;">'
+                                f'<div style="font-size: 1.4rem;">{emoji}</div>'
+                                f'<div style="font-size: 0.72rem; color: #475569; font-weight: 600; margin-top: 2px;">{label}</div>'
+                                f'<div style="font-size: 1rem; font-weight: 800; color: #2563EB; margin-top: 4px;">{time_text}</div>'
+                                '</div>'
+                            )
+                    
+                    TIMES_HTML = (
+                        '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px;">'
+                        + time_card("car", "🚗", "자동차", result.get("car", "-"))
+                        + time_card("transit", "🚇", "대중교통", result.get("transit", "-"))
+                        + time_card("bicycle", "🚴", "자전거", result.get("bicycle", "-"))
+                        + time_card("walk", "🚶", "도보", result.get("walk", "-"))
+                        + '</div>'
+                    )
+                    st.html(TIMES_HTML)
+                    
+                    # 꿀팁 (짧게 1문장)
+                    tip = result.get('tip', '')
+                    if tip:
+                        TIP_HTML = (
+                            '<div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); '
+                            'padding: 10px 14px; border-radius: 10px; '
+                            'border-left: 3px solid #F59E0B; margin-bottom: 12px;">'
+                            '<div style="font-size: 0.8rem; color: #78350F; line-height: 1.6;">'
+                            f'💡 <b>꿀팁</b> {tip}'
+                            '</div></div>'
+                        )
+                        st.html(TIP_HTML)
+                    
+                    # 정확한 정보 안내 + 지도 버튼
+                    NOTICE_HTML = (
+                        '<div style="background: linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 100%); '
+                        'padding: 10px 12px; border-radius: 10px; '
+                        'font-size: 0.75rem; color: #166534; margin-bottom: 10px; line-height: 1.5;">'
+                        '✅ 더 정확한 실시간 정보는 카카오맵·네이버지도에서 확인하세요!'
+                        '</div>'
+                    )
+                    st.html(NOTICE_HTML)
+                    
+                except json.JSONDecodeError:
+                    st.error("결과 파싱 오류. 다시 시도해주세요.")
+            
+            # 카카오맵/네이버지도 (항상 표시)
+            start_enc = urllib.parse.quote(start_address)
+            end_enc = urllib.parse.quote(selected_center['address'])
+            kakao_url = f"https://map.kakao.com/?sName={start_enc}&eName={end_enc}"
+            
+            naver_modes = {"car": "car", "transit": "transit", "bicycle": "bicycle", "walk": "walk"}
+            naver_mode = naver_modes.get(sel_transport, "transit")
+            naver_url = f"https://map.naver.com/p/directions/-/{end_enc}/{naver_mode}"
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.link_button("🗺️ 카카오맵", kakao_url, type="primary", use_container_width=True)
+            with col2:
+                st.link_button("🗺️ 네이버지도", naver_url, use_container_width=True)
+            
+            # 결과 있을 때만 다시 분석 버튼
+            if st.session_state.get('commute_analysis'):
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("🔄 다시 분석하기", use_container_width=True, key="reanalyze_btn"):
+                    del st.session_state['commute_analysis']
                     st.rerun()
         else:
             st.info("👆 출발지를 먼저 입력해주세요!")
-
 
 # ============================================
 # 탭 3: 지원 문의
