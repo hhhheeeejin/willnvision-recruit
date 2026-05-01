@@ -41,22 +41,18 @@ check_password()
 st.title("🔐 윌앤비전 채용 관리자")
 st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
-# ============ 다음 우편번호 API 컴포넌트 함수 ============
-def daum_postcode_widget(target_key="addr_search_result", height=400):
-    """
-    다음 우편번호 검색 위젯
-    target_key: 결과를 저장할 session_state 키
-    """
-    postcode_html = f"""
+
+# ============ 다음 우편번호 API 컴포넌트 ============
+def daum_postcode_widget():
+    return """
     <!DOCTYPE html>
     <html>
     <head>
         <meta charset="utf-8">
         <style>
-            body {{ font-family: 'Pretendard', sans-serif; margin: 0; padding: 10px; background: white; }}
-            .container {{ max-width: 100%; }}
-            .search-btn {{
-                background: linear-gradient(135deg, #4285F4, #2563EB);
+            body { font-family: 'Pretendard', sans-serif; margin: 0; padding: 10px; background: white; }
+            .search-btn {
+                background: #2563EB;
                 color: white;
                 border: none;
                 padding: 12px 20px;
@@ -66,11 +62,9 @@ def daum_postcode_widget(target_key="addr_search_result", height=400):
                 cursor: pointer;
                 width: 100%;
                 margin-bottom: 10px;
-            }}
-            .search-btn:hover {{
-                background: linear-gradient(135deg, #2563EB, #1E40AF);
-            }}
-            .result-box {{
+            }
+            .search-btn:hover { background: #1E40AF; }
+            .result-box {
                 background: #F1F5F9;
                 padding: 12px;
                 border-radius: 10px;
@@ -79,10 +73,10 @@ def daum_postcode_widget(target_key="addr_search_result", height=400):
                 color: #1E293B;
                 line-height: 1.6;
                 display: none;
-            }}
-            .result-box.show {{ display: block; }}
-            .result-label {{ font-weight: 700; color: #1E40AF; margin-bottom: 4px; }}
-            .copy-info {{
+            }
+            .result-box.show { display: block; }
+            .result-label { font-weight: 700; color: #1E40AF; margin-bottom: 4px; }
+            .copy-info {
                 background: #FEF3C7;
                 padding: 10px;
                 border-radius: 8px;
@@ -90,64 +84,61 @@ def daum_postcode_widget(target_key="addr_search_result", height=400):
                 font-size: 12px;
                 color: #92400E;
                 line-height: 1.5;
-            }}
+            }
         </style>
     </head>
     <body>
-        <div class="container">
-            <button class="search-btn" onclick="execDaumPostcode()">
-                🔍 주소 검색하기 (다음 우편번호 API)
-            </button>
-            
-            <div id="result" class="result-box">
-                <div class="result-label">📍 검색 결과</div>
-                <div id="postcode"></div>
-                <div id="address"></div>
-                <div id="extraAddress"></div>
-                <div class="copy-info">
-                    💡 위 주소를 아래 입력 칸에 복사·붙여넣기 하세요!
-                </div>
+        <button class="search-btn" onclick="execDaumPostcode()">
+            🔍 주소 검색하기 (다음 우편번호 API)
+        </button>
+        
+        <div id="result" class="result-box">
+            <div class="result-label">📍 검색 결과</div>
+            <div id="postcode"></div>
+            <div id="address"></div>
+            <div id="extraAddress"></div>
+            <div class="copy-info">
+                💡 위 주소를 아래 입력 칸에 복사·붙여넣기 하세요!
             </div>
         </div>
 
         <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
         <script>
-            function execDaumPostcode() {{
-                new daum.Postcode({{
-                    oncomplete: function(data) {{
+            function execDaumPostcode() {
+                new daum.Postcode({
+                    oncomplete: function(data) {
                         var addr = '';
                         var extraAddr = '';
                         
-                        if (data.userSelectedType === 'R') {{
+                        if (data.userSelectedType === 'R') {
                             addr = data.roadAddress;
-                        }} else {{
+                        } else {
                             addr = data.jibunAddress;
-                        }}
+                        }
                         
-                        if (data.userSelectedType === 'R') {{
-                            if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {{
+                        if (data.userSelectedType === 'R') {
+                            if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
                                 extraAddr += data.bname;
-                            }}
-                            if (data.buildingName !== '' && data.apartment === 'Y') {{
+                            }
+                            if (data.buildingName !== '' && data.apartment === 'Y') {
                                 extraAddr += (extraAddr !== '' ? ', ' + data.buildingName : data.buildingName);
-                            }}
-                            if (extraAddr !== '') {{
+                            }
+                            if (extraAddr !== '') {
                                 extraAddr = ' (' + extraAddr + ')';
-                            }}
-                        }}
+                            }
+                        }
                         
                         document.getElementById('postcode').innerHTML = '<b>우편번호:</b> ' + data.zonecode;
                         document.getElementById('address').innerHTML = '<b>주소:</b> ' + addr + extraAddr;
                         document.getElementById('extraAddress').innerHTML = '<b>참고:</b> ' + (data.buildingName || '없음');
                         document.getElementById('result').classList.add('show');
-                    }}
-                }}).open();
-            }}
+                    }
+                }).open();
+            }
         </script>
     </body>
     </html>
     """
-    return postcode_html
 
 
 tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
@@ -213,15 +204,16 @@ with tab1:
         else:
             st.info("아직 데이터가 없습니다.")
     
-   with col2:
+    with col2:
         st.subheader("⚠️ 담당자 연결 필요")
         st.metric("담당자 연결 요청", f"{stats['needs_human_count']:,}건")
         st.caption("AI가 답변 못한 질문들. 💬 대화기록 탭에서 확인하세요.")
     
-    # 🎯 출근거리 지역 통계 (NEW!)
     st.divider()
+    
+    # 출근거리 지역 통계
     st.subheader("🚇 출근거리 검색 지역 통계")
-    st.caption("어느 지역에서 채용 문의가 많은지 추정 가능해요!")
+    st.caption("어느 지역에서 채용 문의가 많은지 추정 가능")
     
     region_stats = get_commute_region_stats()
     
@@ -230,12 +222,9 @@ with tab1:
         
         with col1:
             st.markdown("**📊 지역별 검색 수 (TOP 10)**")
+            total = sum(c for _, c in region_stats)
             for i, (region, count) in enumerate(region_stats[:10], 1):
-                # 비율 계산
-                total = sum(c for _, c in region_stats)
                 pct = (count / total * 100) if total > 0 else 0
-                
-                # 막대 그래프
                 bar_width = min(pct * 3, 100)
                 BAR_HTML = (
                     f'<div style="margin-bottom: 8px;">'
@@ -244,26 +233,23 @@ with tab1:
                     f'<span style="color: #475569;">{count}회 ({pct:.1f}%)</span>'
                     f'</div>'
                     f'<div style="background: #E2E8F0; border-radius: 6px; height: 8px; overflow: hidden;">'
-                    f'<div style="background: linear-gradient(90deg, #4285F4, #2563EB); '
+                    f'<div style="background: #2563EB; '
                     f'width: {bar_width}%; height: 100%; border-radius: 6px;"></div>'
                     f'</div></div>'
                 )
                 st.html(BAR_HTML)
         
         with col2:
-            st.metric("총 검색 수", f"{sum(c for _, c in region_stats):,}건")
+            st.metric("총 검색 수", f"{total:,}건")
             st.metric("지역 수", f"{len(region_stats)}개")
             
-            # 가장 많은 지역
             if region_stats:
                 top_region, top_count = region_stats[0]
                 st.metric("🏆 1위 지역", top_region, f"{top_count}회")
         
-        # 상세 데이터
         with st.expander("📋 상세 검색 기록 보기"):
             commute_data = get_commute_stats()
             if commute_data:
-                import pandas as pd
                 df_commute = pd.DataFrame([{
                     "시간": c['created_at'][:19].replace('T', ' '),
                     "출발지": c['start_address'],
@@ -274,7 +260,7 @@ with tab1:
                 st.dataframe(df_commute, use_container_width=True, hide_index=True)
     else:
         st.info("아직 출근거리 검색 기록이 없습니다.")
-        
+
 # =============================================================
 # TAB 2: 공고 관리
 # =============================================================
@@ -282,7 +268,6 @@ with tab2:
     st.subheader("📋 공고 관리")
     
     with st.expander("➕ 새 공고 추가하기"):
-        
         active_centers = get_active_centers()
         if active_centers:
             center_options = {c['id']: c['name'] for c in active_centers}
@@ -291,7 +276,6 @@ with tab2:
                 options=list(center_options.keys()),
                 format_func=lambda x: center_options[x],
                 key="new_job_center_select",
-                help="등록된 센터에서 선택"
             )
             
             selected_center = next((c for c in active_centers if c['id'] == new_center_id), None)
@@ -323,7 +307,7 @@ with tab2:
         
         if img_method == "📁 파일 업로드":
             uploaded_file_temp = st.file_uploader(
-                "이미지 선택", 
+                "이미지 선택",
                 type=["png", "jpg", "jpeg", "gif", "webp"],
                 key="new_img_upload",
             )
@@ -435,6 +419,7 @@ with tab2:
                     try:
                         create_job(data)
                         st.success("✅ 공고가 등록되었습니다!")
+                        st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
                         st.error(f"등록 실패: {e}")
@@ -485,10 +470,11 @@ with tab2:
                 with st.form(f"edit_job_{job['id']}"):
                     col1, col2 = st.columns(2)
                     ed_title = col1.text_input("직군명", value=job['title'] or "", key=f"job_title_{job['id']}")
+                    cat_options = ["IB상담", "OB상담", "채팅상담", "사무직", "기타"]
                     ed_category = col2.selectbox(
                         "카테고리",
-                        ["IB상담", "OB상담", "채팅상담", "사무직", "기타"],
-                        index=["IB상담", "OB상담", "채팅상담", "사무직", "기타"].index(job['category']) if job.get('category') in ["IB상담", "OB상담", "채팅상담", "사무직", "기타"] else 0,
+                        cat_options,
+                        index=cat_options.index(job['category']) if job.get('category') in cat_options else 0,
                         key=f"job_cat_{job['id']}"
                     )
                     
@@ -532,21 +518,22 @@ with tab2:
                     st.markdown("**🌐 외부 채용 사이트 (선택)**")
                     col1, col2 = st.columns([1, 2])
                     ed_external_site = col1.text_input(
-                        "사이트명", 
+                        "사이트명",
                         value=job.get('external_site_name') or "",
                         key=f"job_ext_site_{job['id']}"
                     )
                     ed_external_url = col2.text_input(
-                        "URL", 
+                        "URL",
                         value=job.get('external_url') or "",
                         key=f"job_ext_url_{job['id']}"
                     )
                     
                     col1, col2 = st.columns(2)
+                    status_options = ["모집중", "마감", "재오픈예정"]
                     ed_status = col1.selectbox(
                         "상태",
-                        ["모집중", "마감", "재오픈예정"],
-                        index=["모집중", "마감", "재오픈예정"].index(job['status']),
+                        status_options,
+                        index=status_options.index(job['status']) if job['status'] in status_options else 0,
                         key=f"job_status_{job['id']}"
                     )
                     ed_order = col2.number_input("순서", min_value=0, value=job.get('display_order') or 0, key=f"job_order_{job['id']}")
@@ -591,6 +578,7 @@ with tab2:
                         try:
                             update_job(job['id'], data)
                             st.success("✅ 수정 완료!")
+                            st.cache_data.clear()
                             st.rerun()
                         except Exception as e:
                             st.error(f"수정 실패: {e}")
@@ -599,20 +587,19 @@ with tab2:
                         try:
                             delete_job(job['id'])
                             st.success("🗑️ 삭제됨")
+                            st.cache_data.clear()
                             st.rerun()
                         except Exception as e:
                             st.error(f"삭제 실패: {e}")
 
 # =============================================================
-# TAB 3: 센터 관리 (다음 우편번호 API 추가!)
+# TAB 3: 센터 관리
 # =============================================================
 with tab3:
     st.subheader("🏢 센터 관리")
     st.caption("근무지(센터) 정보를 관리하고, 센터별 FAQ를 등록하세요.")
     
     with st.expander("➕ 새 센터 추가"):
-        
-        # 🔍 다음 우편번호 검색 (폼 밖)
         st.markdown("**🔍 주소 검색 (다음 우편번호 API)**")
         st.caption("정확한 주소를 검색해서 아래 입력 칸에 복사·붙여넣기 하세요!")
         
@@ -627,7 +614,7 @@ with tab3:
             
             col1, col2 = st.columns([2, 1])
             nc_address = col1.text_input(
-                "주소 *", 
+                "주소 *",
                 placeholder="예: 서울특별시 강남구 강남대로 123",
                 help="🔍 위 '주소 검색하기' 버튼으로 검색 후 복사해서 붙여넣기"
             )
@@ -677,6 +664,7 @@ with tab3:
                             "display_order": nc_order,
                         })
                         st.success("✅ 센터가 등록되었습니다!")
+                        st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
                         st.error(f"등록 실패: {e}")
@@ -693,11 +681,8 @@ with tab3:
             status_badge = "🟢 활성" if c.get('is_active') else "⚫ 비활성"
             with st.expander(f"**{c['name']}** — {status_badge}", expanded=False):
                 
-                # 🔍 수정 시에도 주소 검색 가능
-                st.markdown("**🔍 주소 검색 (수정 시 사용)**")
-                st.caption("필요시 주소를 다시 검색할 수 있어요")
                 with st.expander("🗺️ 주소 검색 열기"):
-                    st.components.v1.html(daum_postcode_widget(target_key=f"addr_search_{c['id']}"), height=350)
+                    st.components.v1.html(daum_postcode_widget(), height=350)
                 
                 with st.form(f"edit_center_{c['id']}"):
                     col1, col2 = st.columns(2)
@@ -705,8 +690,8 @@ with tab3:
                     ec_phone = col2.text_input("연락처", value=c.get('phone') or "", key=f"ctr_phone_{c['id']}")
                     
                     ec_address = st.text_input(
-                        "주소", 
-                        value=c['address'], 
+                        "주소",
+                        value=c['address'],
                         help="🔍 위 '주소 검색 열기'에서 검색 후 복사해서 붙여넣기",
                         key=f"ctr_addr_{c['id']}"
                     )
@@ -721,11 +706,6 @@ with tab3:
                     ec_info_note = st.text_area(
                         "📝 센터 고유 정보 (AI 챗봇 참조용)",
                         value=c.get('info_note') or "",
-                        placeholder="""예:
-- 위치: 문래역 5번 출구 도보 3분
-- 휴게실: 3층 (자판기, 전자레인지)
-- 주차: 건물 뒤 3대 (선착순)
-- 분위기: 편안하고 수평적""",
                         height=180,
                         key=f"ctr_info_{c['id']}"
                     )
@@ -755,6 +735,7 @@ with tab3:
                                 "display_order": ec_order,
                             })
                             st.success("✅ 수정 완료!")
+                            st.cache_data.clear()
                             st.rerun()
                         except Exception as e:
                             st.error(f"실패: {e}")
@@ -763,6 +744,7 @@ with tab3:
                         try:
                             delete_center(c['id'])
                             st.success("🗑️ 삭제됨")
+                            st.cache_data.clear()
                             st.rerun()
                         except Exception as e:
                             st.error(f"실패: {e}")
@@ -789,6 +771,7 @@ with tab3:
                                         "is_active": True,
                                     })
                                     st.success("✅ FAQ 등록!")
+                                    st.cache_data.clear()
                                     st.rerun()
                                 except Exception as e:
                                     st.error(f"실패: {e}")
@@ -809,7 +792,7 @@ with tab3:
                             with col2:
                                 if st.button("🗑️", key=f"cf_del_{cfaq['id']}"):
                                     delete_center_faq(cfaq['id'])
-                                    st.success("삭제됨")
+                                    st.cache_data.clear()
                                     st.rerun()
                             
                             if st.session_state.get(f"edit_cfaq_{cfaq['id']}"):
@@ -828,6 +811,7 @@ with tab3:
                                             "is_active": new_active,
                                         })
                                         st.session_state[f"edit_cfaq_{cfaq['id']}"] = False
+                                        st.cache_data.clear()
                                         st.rerun()
                                     if sc2.form_submit_button("취소", use_container_width=True):
                                         st.session_state[f"edit_cfaq_{cfaq['id']}"] = False
@@ -852,7 +836,7 @@ with tab4:
             new_answer = st.text_area("답변 *")
             
             col1, col2 = st.columns(2)
-            new_show_faq = col1.checkbox("메인 FAQ에 표시", value=True)
+            new_show_faq = col1.checkbox("메인 FAQ에 표시", value=False, help="메인 페이지에 자주 묻는 질문으로 표시")
             new_active = col2.checkbox("활성화", value=True)
             
             submitted = st.form_submit_button("💾 등록", type="primary", use_container_width=True)
@@ -870,6 +854,7 @@ with tab4:
                             "is_active": new_active,
                         })
                         st.success("✅ 등록 완료!")
+                        st.cache_data.clear()
                         st.rerun()
                     except Exception as e:
                         st.error(f"실패: {e}")
@@ -887,16 +872,17 @@ with tab4:
                     ed_a = st.text_area("답변", value=item.get('answer') or "", key=f"faq_a_{item['id']}")
                     
                     col1, col2 = st.columns(2)
+                    cat_options = ["회사소개", "담당자", "지원방법", "근무조건", "기타"]
                     ed_cat = col1.selectbox(
                         "카테고리",
-                        ["회사소개", "담당자", "지원방법", "근무조건", "기타"],
-                        index=["회사소개", "담당자", "지원방법", "근무조건", "기타"].index(item.get('category')) if item.get('category') in ["회사소개", "담당자", "지원방법", "근무조건", "기타"] else 4,
+                        cat_options,
+                        index=cat_options.index(item.get('category')) if item.get('category') in cat_options else 4,
                         key=f"faq_cat_{item['id']}"
                     )
                     ed_order = col2.number_input("순서", min_value=0, value=item.get('display_order') or 0, key=f"faq_ord_{item['id']}")
                     
                     col1, col2 = st.columns(2)
-                    ed_show = col1.checkbox("FAQ에 표시", value=item.get('show_in_faq', True), key=f"faq_show_{item['id']}")
+                    ed_show = col1.checkbox("FAQ에 표시", value=item.get('show_in_faq', False), key=f"faq_show_{item['id']}")
                     ed_active = col2.checkbox("활성화", value=item.get('is_active', True), key=f"faq_act_{item['id']}")
                     
                     col1, col2 = st.columns(2)
@@ -913,10 +899,11 @@ with tab4:
                             "is_active": ed_active,
                         })
                         st.success("저장됨!")
+                        st.cache_data.clear()
                         st.rerun()
                     if delete:
                         delete_knowledge(item['id'])
-                        st.success("삭제됨")
+                        st.cache_data.clear()
                         st.rerun()
 
 # =============================================================
@@ -984,15 +971,12 @@ with tab5:
         new_sug_q3 = col1.text_input("추천 질문 3", value=settings.get('suggested_q_3', ''))
         new_sug_q4 = col2.text_input("추천 질문 4", value=settings.get('suggested_q_4', ''))
         
+        tone_options = ["friendly", "casual", "formal"]
         new_tone = st.selectbox(
             "말투 스타일",
-            ["friendly", "casual", "formal"],
+            tone_options,
             format_func=lambda x: {"friendly": "😊 친근하게", "casual": "🙌 편하게", "formal": "🎩 격식있게"}[x],
-            index=["friendly", "casual", "formal"].index(settings.get('chatbot_tone', 'friendly'))
-        )
-        new_auto_apply = st.checkbox(
-            "대화 중 자동 지원 유도",
-            value=settings.get('chatbot_auto_apply_prompt', 'true') == 'true',
+            index=tone_options.index(settings.get('chatbot_tone', 'friendly')) if settings.get('chatbot_tone', 'friendly') in tone_options else 0
         )
         
         submitted = st.form_submit_button("💾 모든 설정 저장", type="primary", use_container_width=True)
@@ -1023,12 +1007,12 @@ with tab5:
                 'suggested_q_3': new_sug_q3,
                 'suggested_q_4': new_sug_q4,
                 'chatbot_tone': new_tone,
-                'chatbot_auto_apply_prompt': 'true' if new_auto_apply else 'false',
             }
             try:
                 for k, v in updates.items():
                     update_setting(k, v)
                 st.success("✅ 모든 설정이 저장되었습니다!")
+                st.cache_data.clear()
                 st.rerun()
             except Exception as e:
                 st.error(f"저장 실패: {e}")
