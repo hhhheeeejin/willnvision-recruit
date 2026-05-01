@@ -1,50 +1,81 @@
 import streamlit as st
-from supabase import create_client
+from supabase import create_client, Client
 from datetime import datetime
 import uuid
 
 
-@st.cache_resource
-def get_supabase():
+# ============ Supabase 클라이언트 ============
+
+def get_supabase() -> Client:
     """일반 사용자용 (anon key)"""
     url = st.secrets["SUPABASE_URL"]
     key = st.secrets["SUPABASE_ANON_KEY"]
     return create_client(url, key)
 
 
-@st.cache_resource
-def get_supabase_admin():
+def get_supabase_admin() -> Client:
     """관리자용 (service key)"""
     url = st.secrets["SUPABASE_URL"]
-    key = st.secrets["SUPABASE_SERVICE_KEY"]
+    key = st.secrets.get("SUPABASE_SERVICE_KEY", st.secrets["SUPABASE_ANON_KEY"])
     return create_client(url, key)
 
 
-# ============ 공고 (Jobs) ============
+# ============ 사이트 설정 ============
+
+def get_site_settings():
+    try:
+        sb = get_supabase()
+        res = sb.table("site_settings").select("*").execute()
+        return {item["key"]: item["value"] for item in res.data}
+    except Exception as e:
+        print(f"설정 로드 실패: {e}")
+        return {}
+
+
+def update_setting(key, value):
+    try:
+        sb = get_supabase_admin()
+        existing = sb.table("site_settings").select("*").eq("key", key).execute()
+        if existing.data:
+            sb.table("site_settings").update({"value": value}).eq("key", key).execute()
+        else:
+            sb.table("site_settings").insert({"key": key, "value": value}).execute()
+        return True
+    except Exception as e:
+        print(f"설정 저장 실패: {e}")
+        return False
+
+
+# ============ 공고 ============
 
 def get_active_jobs():
-    sb = get_supabase()
-    res = sb.table("jobs").select("*").eq("status", "모집중").order("display_order").execute()
-    return res.data
+    try:
+        sb = get_supabase()
+        res = sb.table("jobs").select("*").eq("status", "모집중").order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        print(f"공고 로드 실패: {e}")
+        return []
 
 
 def get_active_jobs_with_center():
-    """공고 + 연결된 센터 정보까지"""
-    sb = get_supabase()
-    res = sb.table("jobs").select("*, centers(*)").eq("status", "모집중").order("display_order").execute()
-    return res.data
+    try:
+        sb = get_supabase()
+        res = sb.table("jobs").select("*, centers(*)").in_("status", ["모집중", "재오픈예정"]).order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        print(f"공고+센터 로드 실패: {e}")
+        return []
 
 
 def get_all_jobs():
-    sb = get_supabase_admin()
-    res = sb.table("jobs").select("*").order("display_order").execute()
-    return res.data
-
-
-def get_job(job_id):
-    sb = get_supabase()
-    res = sb.table("jobs").select("*").eq("id", job_id).single().execute()
-    return res.data
+    try:
+        sb = get_supabase_admin()
+        res = sb.table("jobs").select("*, centers(*)").order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        print(f"전체 공고 로드 실패: {e}")
+        return []
 
 
 def create_job(data):
@@ -62,71 +93,66 @@ def delete_job(job_id):
     sb.table("jobs").delete().eq("id", job_id).execute()
 
 
-def update_job_status(job_id, status):
-    sb = get_supabase_admin()
-    sb.table("jobs").update({"status": status}).eq("id", job_id).execute()
-
-
-# ============ 조회/지원 추적 ============
-
-def increment_job_view(job_id, session_id=None):
-    """공고 문의 클릭 추적"""
+def increment_job_view(job_id, session_id):
     try:
         sb = get_supabase()
-        if session_id:
-            sb.table("job_views").insert({
-                "job_id": job_id,
-                "session_id": session_id
-            }).execute()
-        job = get_job(job_id)
-        if job:
-            new_count = (job.get('view_count') or 0) + 1
-            sb.table("jobs").update({"view_count": new_count}).eq("id", job_id).execute()
-    except Exception:
-        pass
+        sb.table("job_views").insert({
+            "job_id": job_id,
+            "session_id": session_id,
+        }).execute()
+    except Exception as e:
+        print(f"view 기록 실패: {e}")
+    
+    try:
+        sb_admin = get_supabase_admin()
+        current = sb_admin.table("jobs").select("view_count").eq("id", job_id).execute()
+        if current.data:
+            new_count = (current.data[0].get("view_count") or 0) + 1
+            sb_admin.table("jobs").update({"view_count": new_count}).eq("id", job_id).execute()
+    except Exception as e:
+        print(f"view 카운트 실패: {e}")
 
 
-def increment_job_apply(job_id, session_id=None):
-    """공고 지원 클릭 추적"""
+def increment_job_apply(job_id, session_id):
     try:
         sb = get_supabase()
-        if session_id:
-            sb.table("job_apply_clicks").insert({
-                "job_id": job_id,
-                "session_id": session_id
-            }).execute()
-        job = get_job(job_id)
-        if job:
-            new_count = (job.get('apply_count') or 0) + 1
-            sb.table("jobs").update({"apply_count": new_count}).eq("id", job_id).execute()
-    except Exception:
-        pass
+        sb.table("job_apply_clicks").insert({
+            "job_id": job_id,
+            "session_id": session_id,
+        }).execute()
+    except Exception as e:
+        print(f"apply 기록 실패: {e}")
+    
+    try:
+        sb_admin = get_supabase_admin()
+        current = sb_admin.table("jobs").select("apply_count").eq("id", job_id).execute()
+        if current.data:
+            new_count = (current.data[0].get("apply_count") or 0) + 1
+            sb_admin.table("jobs").update({"apply_count": new_count}).eq("id", job_id).execute()
+    except Exception as e:
+        print(f"apply 카운트 실패: {e}")
 
 
-def get_popular_jobs(limit=5):
-    sb = get_supabase_admin()
-    res = sb.table("jobs").select("*").order("view_count", desc=True).limit(limit).execute()
-    return res.data
-
-
-# ============ 센터 (Centers) ============
+# ============ 센터 ============
 
 def get_active_centers():
-    sb = get_supabase()
-    res = sb.table("centers").select("*").eq("is_active", True).order("display_order").execute()
-    return res.data
+    try:
+        sb = get_supabase()
+        res = sb.table("centers").select("*").eq("is_active", True).order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        print(f"센터 로드 실패: {e}")
+        return []
 
 
 def get_all_centers():
-    sb = get_supabase_admin()
-    res = sb.table("centers").select("*").order("display_order").execute()
-    return res.data
-
-
-def get_center(center_id):
-    sb = get_supabase()
-    res = sb.table("centers").select("*").eq("id", center_id).single().execute()
-    return res.data
+    try:
+        sb = get_supabase_admin()
+        res = sb.table("centers").select("*").order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        print(f"전체 센터 로드 실패: {e}")
+        return []
 
 
 def create_center(data):
@@ -144,20 +170,25 @@ def delete_center(center_id):
     sb.table("centers").delete().eq("id", center_id).execute()
 
 
-# ============ 센터별 FAQ ============
+# ============ 센터 FAQ ============
 
 def get_center_faqs(center_id):
-    """특정 센터의 활성 FAQ만 조회 (챗봇용)"""
-    sb = get_supabase()
-    res = sb.table("center_faqs").select("*").eq("center_id", center_id).eq("is_active", True).order("display_order").execute()
-    return res.data
+    try:
+        sb = get_supabase()
+        res = sb.table("center_faqs").select("*").eq("center_id", center_id).eq("is_active", True).order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        print(f"센터 FAQ 로드 실패: {e}")
+        return []
 
 
 def get_all_center_faqs(center_id):
-    """관리자용 - 전체 조회 (비활성 포함)"""
-    sb = get_supabase_admin()
-    res = sb.table("center_faqs").select("*").eq("center_id", center_id).order("display_order").execute()
-    return res.data
+    try:
+        sb = get_supabase_admin()
+        res = sb.table("center_faqs").select("*").eq("center_id", center_id).order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        return []
 
 
 def create_center_faq(data):
@@ -175,20 +206,51 @@ def delete_center_faq(faq_id):
     sb.table("center_faqs").delete().eq("id", faq_id).execute()
 
 
-# ============ 지원자 (Applicants) - 사용 안함, 구글폼 대체 ============
+# ============ 공통 FAQ ============
 
-def get_all_applicants():
+def get_knowledge_base():
+    try:
+        sb = get_supabase()
+        res = sb.table("knowledge_base").select("*").eq("is_active", True).order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        return []
+
+
+def get_faq_items():
+    try:
+        sb = get_supabase()
+        res = sb.table("knowledge_base").select("*").eq("is_active", True).eq("show_in_faq", True).order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        return []
+
+
+def get_all_knowledge():
+    try:
+        sb = get_supabase_admin()
+        res = sb.table("knowledge_base").select("*").order("display_order").execute()
+        return res.data or []
+    except Exception as e:
+        return []
+
+
+def create_knowledge(data):
     sb = get_supabase_admin()
-    res = sb.table("applicants").select("*").order("created_at", desc=True).execute()
-    return res.data
+    sb.table("knowledge_base").insert(data).execute()
 
 
-def update_applicant_status(applicant_id, status):
+def update_knowledge(item_id, data):
     sb = get_supabase_admin()
-    sb.table("applicants").update({"status": status}).eq("id", applicant_id).execute()
+    sb.table("knowledge_base").update(data).eq("id", item_id).execute()
 
 
-# ============ 대화 기록 (Conversations) ============
+def delete_knowledge(item_id):
+    sb = get_supabase_admin()
+    sb.table("knowledge_base").delete().eq("id", item_id).execute()
+
+
+# ============ 대화 기록 ============
 
 def save_conversation(session_id, question, answer, related_job_id=None, needs_human=False):
     try:
@@ -200,165 +262,100 @@ def save_conversation(session_id, question, answer, related_job_id=None, needs_h
             "related_job_id": related_job_id,
             "needs_human": needs_human,
         }).execute()
-    except Exception:
-        pass
+        return True
+    except Exception as e:
+        print(f"대화 저장 실패: {e}")
+        return False
 
 
 def get_all_conversations():
-    sb = get_supabase_admin()
-    res = sb.table("conversations").select("*, jobs(title)").order("created_at", desc=True).execute()
-    return res.data
-
-
-# ============ FAQ / 지식 베이스 (Knowledge Base) ============
-
-def get_knowledge_base():
-    """챗봇이 참조하는 전체 지식"""
-    sb = get_supabase()
-    res = sb.table("knowledge_base").select("*").eq("is_active", True).order("display_order").execute()
-    return res.data
-
-
-def get_faq_items():
-    """메인 페이지에 표시되는 FAQ"""
-    sb = get_supabase()
-    res = sb.table("knowledge_base").select("*").eq("is_active", True).eq("show_in_faq", True).order("display_order").execute()
-    return res.data
-
-
-def get_all_knowledge():
-    sb = get_supabase_admin()
-    res = sb.table("knowledge_base").select("*").order("display_order").execute()
-    return res.data
-
-
-def create_knowledge(data):
-    sb = get_supabase_admin()
-    sb.table("knowledge_base").insert(data).execute()
-
-
-def update_knowledge(kb_id, data):
-    sb = get_supabase_admin()
-    sb.table("knowledge_base").update(data).eq("id", kb_id).execute()
-
-
-def delete_knowledge(kb_id):
-    sb = get_supabase_admin()
-    sb.table("knowledge_base").delete().eq("id", kb_id).execute()
-
-
-# ============ 사이트 설정 (Site Settings) ============
-
-def get_site_settings():
-    sb = get_supabase()
-    res = sb.table("site_settings").select("*").execute()
-    return {item['key']: item['value'] for item in res.data}
-
-
-def update_setting(key, value):
-    sb = get_supabase_admin()
-    existing = sb.table("site_settings").select("*").eq("key", key).execute()
-    if existing.data:
-        sb.table("site_settings").update({"value": value}).eq("key", key).execute()
-    else:
-        sb.table("site_settings").insert({"key": key, "value": value}).execute()
-
-
-# ============ 이미지 업로드 (Storage) ============
-
-def upload_image(file_bytes, filename):
     try:
         sb = get_supabase_admin()
-        ext = filename.split('.')[-1]
-        unique_name = f"{uuid.uuid4()}.{ext}"
-        sb.storage.from_("job-images").upload(unique_name, file_bytes)
-        url = sb.storage.from_("job-images").get_public_url(unique_name)
-        return url
+        res = sb.table("conversations").select("*, jobs(title)").order("created_at", desc=True).execute()
+        return res.data or []
     except Exception as e:
-        print(f"Upload error: {e}")
-        return None
+        return []
 
 
-def delete_image(url):
-    try:
-        sb = get_supabase_admin()
-        filename = url.split('/')[-1].split('?')[0]
-        sb.storage.from_("job-images").remove([filename])
-    except Exception:
-        pass
-
-
-# ============ 통계 (Stats) ============
+# ============ 통계 ============
 
 def get_stats():
-    sb = get_supabase_admin()
-    
-    jobs_total = sb.table("jobs").select("id", count="exact").execute()
-    jobs_active = sb.table("jobs").select("id", count="exact").eq("status", "모집중").execute()
-    
-    conversations = sb.table("conversations").select("session_id, needs_human").execute()
-    total_conv = len(conversations.data)
-    unique_sess = len(set(c['session_id'] for c in conversations.data))
-    needs_human = sum(1 for c in conversations.data if c['needs_human'])
-    
-    try:
-        applicants = sb.table("applicants").select("id", count="exact").execute()
-        applicants_total = applicants.count
-    except Exception:
-        applicants_total = 0
-    
-    return {
-        'jobs_total': jobs_total.count,
-        'jobs_active': jobs_active.count,
-        'total_conversations': total_conv,
-        'unique_visitors': unique_sess,
-        'needs_human_count': needs_human,
-        'applicants_total': applicants_total,
-    }
-
-# ============ 이미지 업로드 (Supabase Storage) ============
-
-def upload_image(file_bytes, filename):
-    """
-    이미지 파일을 Supabase Storage의 job-images 버킷에 업로드
-    """
     try:
         sb = get_supabase_admin()
-        ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else 'jpg'
-        unique_name = f"{uuid.uuid4()}.{ext}"
+        
+        all_jobs = sb.table("jobs").select("id, status").execute()
+        jobs_total = len(all_jobs.data) if all_jobs.data else 0
+        jobs_active = sum(1 for j in (all_jobs.data or []) if j.get("status") == "모집중")
+        
+        convs = sb.table("conversations").select("session_id, needs_human").execute()
+        total_conv = len(convs.data) if convs.data else 0
+        unique_sessions = len(set(c["session_id"] for c in (convs.data or [])))
+        needs_human = sum(1 for c in (convs.data or []) if c.get("needs_human"))
+        
+        return {
+            "jobs_total": jobs_total,
+            "jobs_active": jobs_active,
+            "total_conversations": total_conv,
+            "unique_visitors": unique_sessions,
+            "needs_human_count": needs_human,
+        }
+    except Exception as e:
+        print(f"통계 실패: {e}")
+        return {
+            "jobs_total": 0, "jobs_active": 0,
+            "total_conversations": 0, "unique_visitors": 0,
+            "needs_human_count": 0,
+        }
+
+
+def get_popular_jobs(limit=5):
+    try:
+        sb = get_supabase_admin()
+        res = sb.table("jobs").select("*").order("view_count", desc=True).limit(limit).execute()
+        return res.data or []
+    except Exception as e:
+        return []
+
+
+# ============ 이미지 업로드 ============
+
+def upload_image(file_bytes, filename):
+    try:
+        sb = get_supabase_admin()
+        clean_filename = "".join(c if c.isalnum() or c in "._-" else "_" for c in filename)
+        unique_filename = f"{datetime.now().strftime('%Y%m%d%H%M%S')}_{uuid.uuid4().hex[:8]}_{clean_filename}"
         
         sb.storage.from_("job-images").upload(
-            unique_name, 
+            unique_filename,
             file_bytes,
-            file_options={"content-type": f"image/{ext}"}
+            file_options={"content-type": "image/jpeg"}
         )
         
-        url = sb.storage.from_("job-images").get_public_url(unique_name)
-        return url
-    
+        public_url = sb.storage.from_("job-images").get_public_url(unique_filename)
+        return public_url
     except Exception as e:
-        print(f"❌ 이미지 업로드 실패: {e}")
+        print(f"이미지 업로드 실패: {e}")
         return None
 
 
-def delete_image(url):
-    """이미지 삭제"""
+def delete_image(image_url):
     try:
+        if not image_url or "job-images" not in image_url:
+            return False
+        filename = image_url.split("job-images/")[-1].split("?")[0]
         sb = get_supabase_admin()
-        filename = url.split('/')[-1].split('?')[0]
         sb.storage.from_("job-images").remove([filename])
         return True
-    except Exception:
+    except Exception as e:
+        print(f"이미지 삭제 실패: {e}")
         return False
+
 
 # ============ 출근거리 검색 기록 ============
 
 def save_commute_search(session_id, start_address, center_id, center_name, transport_type):
-    """출근거리 검색 기록 저장 (지역 자동 추출)"""
     try:
-        # 출발지 주소에서 지역 추출 (간단한 룰 기반)
         region = extract_region(start_address)
-        
         sb = get_supabase()
         sb.table("commute_searches").insert({
             "session_id": session_id,
@@ -370,34 +367,32 @@ def save_commute_search(session_id, start_address, center_id, center_name, trans
         }).execute()
         return True
     except Exception as e:
-        print(f"출근거리 기록 저장 실패: {e}")
+        print(f"출근거리 기록 실패: {e}")
         return False
 
 
 def extract_region(address):
-    """주소에서 지역 추출 (예: '서울', '경기', '인천')"""
     if not address:
         return "기타"
     
     addr = address.strip()
     
-    # 광역시/도 매칭
     region_map = {
         '서울': ['서울', '강남', '강북', '마포', '용산', '종로', '성동', '광진', '동대문',
                 '중랑', '성북', '도봉', '노원', '은평', '서대문', '양천', '강서', '구로',
-                '금천', '영등포', '동작', '관악', '서초', '송파', '강동', '중구',
+                '금천', '영등포', '동작', '관악', '서초', '송파', '강동',
                 '홍대', '신촌', '잠실', '여의도', '문래', '당산'],
         '경기': ['경기', '고양', '성남', '수원', '용인', '안양', '안산', '부천', '광명',
-                '평택', '시흥', '김포', '광주', '의정부', '하남', '구리', '남양주', '오산',
-                '이천', '안성', '의왕', '양주', '동두천', '과천', '여주', '포천', '연천',
+                '평택', '시흥', '김포', '의정부', '하남', '구리', '남양주', '오산',
+                '이천', '안성', '의왕', '양주', '동두천', '과천', '여주', '포천',
                 '가평', '양평', '화성', '파주', '군포'],
-        '인천': ['인천', '부평', '계양', '연수', '남동', '서구', '중구', '강화', '옹진'],
-        '부산': ['부산', '해운대', '수영', '동래', '연제', '부산진', '남구', '북구',
-                '사하', '사상', '강서', '금정', '기장'],
+        '인천': ['인천', '부평', '계양', '연수', '남동', '강화', '옹진'],
+        '부산': ['부산', '해운대', '수영', '동래', '연제', '부산진', '사하', '사상',
+                '금정', '기장'],
         '대구': ['대구', '달서', '달성', '수성'],
         '광주': ['광주광역시'],
-        '대전': ['대전', '유성', '서구', '중구', '동구', '대덕'],
-        '울산': ['울산', '북구', '남구', '동구', '중구', '울주'],
+        '대전': ['대전', '유성', '대덕'],
+        '울산': ['울산', '울주'],
         '세종': ['세종'],
         '강원': ['강원', '춘천', '원주', '강릉', '동해', '태백', '속초', '삼척'],
         '충청': ['충청', '천안', '청주', '아산', '서산', '당진', '공주', '보령'],
@@ -415,28 +410,22 @@ def extract_region(address):
 
 
 def get_commute_stats():
-    """출근거리 검색 통계 (관리자용)"""
     try:
         sb = get_supabase_admin()
         res = sb.table("commute_searches").select("*").order("created_at", desc=True).execute()
         return res.data or []
     except Exception as e:
-        print(f"출근거리 통계 조회 실패: {e}")
         return []
 
 
 def get_commute_region_stats():
-    """지역별 검색 통계 집계"""
     try:
         searches = get_commute_stats()
         region_count = {}
         for s in searches:
             region = s.get('region', '기타')
             region_count[region] = region_count.get(region, 0) + 1
-        
-        # 정렬: 많은 순
         sorted_regions = sorted(region_count.items(), key=lambda x: x[1], reverse=True)
         return sorted_regions
     except Exception as e:
-        print(f"지역 통계 실패: {e}")
         return []
