@@ -30,7 +30,7 @@ if "from_job_card" not in st.session_state:
 if "messages_history" not in st.session_state:
     st.session_state.messages_history = []
 
-# ============ 캐싱 (성능 최적화) ============
+# ============ 캐싱 ============
 @st.cache_data(ttl=1800)
 def load_settings():
     return get_site_settings()
@@ -57,7 +57,6 @@ def load_center_faqs(center_id):
 
 @st.cache_data(ttl=1800)
 def build_cached_system_prompt(bot_name, manager_name, manager_phone, tone):
-    """시스템 프롬프트 캐싱 (DB 안 부름)"""
     active_jobs_list = load_active_jobs()
     kb = load_knowledge_base()
     centers_list = load_active_centers()
@@ -137,7 +136,7 @@ bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에�
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# ============ CSS (단순화 + 버튼 강제 통일) ============
+# ============ CSS (버튼 강제 통일) ============
 CUSTOM_CSS = """
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
 <style>
@@ -246,14 +245,24 @@ section.main { scroll-behavior: auto !important; }
     margin: 6px 0 !important;
 }
 
-/* 🎯 버튼 크기 강제 통일 */
-.stButton, .stLinkButton {
+/* ====================================
+   🎯 모든 버튼 강제 통일 (크기·색·정렬)
+   ==================================== */
+
+/* 모든 버튼 컨테이너 */
+.stButton, .stLinkButton, [data-testid="stLinkButton"] {
     height: 44px !important;
+    width: 100% !important;
 }
 
+/* 버튼 본체 (기본 스타일) */
 .stButton > button,
 .stLinkButton > a,
-.stLinkButton > a > button {
+.stLinkButton > a > button,
+[data-testid="baseButton-primary"],
+[data-testid="baseButton-secondary"],
+[data-testid="baseButton-primaryFormSubmit"],
+[data-testid="baseButton-secondaryFormSubmit"] {
     border-radius: 10px !important;
     font-weight: 700 !important;
     border: 2px solid transparent !important;
@@ -273,45 +282,94 @@ section.main { scroll-behavior: auto !important; }
     justify-content: center !important;
     box-sizing: border-box !important;
     line-height: 1 !important;
+    text-decoration: none !important;
+    margin: 0 !important;
 }
 
+/* 🔑 LinkButton의 a 태그 - 직접 스타일 적용 (이게 핵심!) */
 .stLinkButton > a {
     text-decoration: none !important;
-    display: block !important;
+    background: white !important;
+    color: #1E40AF !important;
+    border: 2px solid #BFDBFE !important;
+    border-radius: 10px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    font-weight: 700 !important;
+    font-size: 0.88rem !important;
+    padding: 0 0.5rem !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
 }
 
+.stLinkButton > a:hover {
+    background: #EFF6FF !important;
+    border-color: #4285F4 !important;
+}
+
+/* LinkButton 내부 button은 투명하게 */
+.stLinkButton > a > button {
+    background: transparent !important;
+    border: none !important;
+    color: inherit !important;
+    height: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* 🎯 Primary 버튼 (파란색 통일) */
 .stButton > button[kind="primary"],
-.stLinkButton > a > button[kind="primary"] {
+[data-testid="baseButton-primary"],
+[data-testid="baseButton-primaryFormSubmit"] {
     background: #2563EB !important;
     color: white !important;
     border: 2px solid #2563EB !important;
 }
 
 .stButton > button[kind="primary"]:hover,
-.stLinkButton > a > button[kind="primary"]:hover {
+[data-testid="baseButton-primary"]:hover,
+[data-testid="baseButton-primaryFormSubmit"]:hover {
     background: #1E40AF !important;
+    border-color: #1E40AF !important;
 }
 
+/* 🎯 Secondary 버튼 (흰색 통일) */
 .stButton > button[kind="secondary"],
-.stLinkButton > a > button[kind="secondary"] {
+[data-testid="baseButton-secondary"],
+[data-testid="baseButton-secondaryFormSubmit"] {
     background: white !important;
     color: #1E40AF !important;
     border: 2px solid #BFDBFE !important;
 }
 
 .stButton > button[kind="secondary"]:hover,
-.stLinkButton > a > button[kind="secondary"]:hover {
+[data-testid="baseButton-secondary"]:hover,
+[data-testid="baseButton-secondaryFormSubmit"]:hover {
     background: #EFF6FF !important;
     border-color: #4285F4 !important;
 }
 
+/* 🎯 모든 버튼 텍스트 중앙 정렬 강제 */
 .stButton > button > div,
 .stLinkButton > a > button > div,
 .stButton > button p,
-.stLinkButton > a > button p {
+.stLinkButton > a > button p,
+.stLinkButton > a > div,
+.stLinkButton > a p {
     margin: 0 !important;
     padding: 0 !important;
     line-height: 1 !important;
+    text-align: center !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    color: inherit !important;
 }
 
 .stTextInput > div > div > input,
@@ -388,7 +446,9 @@ section.main { scroll-behavior: auto !important; }
 
     .stButton > button,
     .stLinkButton > a,
-    .stLinkButton > a > button {
+    .stLinkButton > a > button,
+    [data-testid="baseButton-primary"],
+    [data-testid="baseButton-secondary"] {
         font-size: 0.78rem !important;
         padding: 0 0.4rem !important;
         height: 42px !important;
@@ -418,8 +478,7 @@ section.main { scroll-behavior: auto !important; }
     .stTextArea > div > div > textarea {
         background: white !important; color: #1E293B !important;
     }
-    .stButton > button[kind="secondary"],
-    .stLinkButton > a > button[kind="secondary"] {
+    .stLinkButton > a {
         background: white !important;
         color: #1E40AF !important;
         border: 2px solid #BFDBFE !important;
@@ -537,7 +596,7 @@ with tab_cols[0]:
 
 with tab_cols[1]:
     if default_form_url:
-        st.link_button("간편지원", default_form_url, use_container_width=True, type="secondary")
+        st.link_button("간편지원", default_form_url, use_container_width=True)
     else:
         st.button("간편지원", key="btn_apply_disabled", use_container_width=True, disabled=True)
 
@@ -655,7 +714,7 @@ if st.session_state.active_tab == "chat":
                 st.empty()
         with col2:
             if default_form_url:
-                st.link_button("지원하기", default_form_url, use_container_width=True, type="primary")
+                st.link_button("지원하기", default_form_url, use_container_width=True)
         with col3:
             if st.button("새 대화", use_container_width=True):
                 if st.session_state.messages:
@@ -870,7 +929,7 @@ elif st.session_state.active_tab == "distance":
 
             col1, col2 = st.columns(2)
             with col1:
-                st.link_button("🗺️ 카카오맵", kakao_url, type="primary", use_container_width=True)
+                st.link_button("🗺️ 카카오맵", kakao_url, use_container_width=True)
             with col2:
                 st.link_button("🗺️ 네이버지도", naver_url, use_container_width=True)
 
@@ -904,7 +963,7 @@ elif st.session_state.active_tab == "contact":
         )
         st.html(KAKAO_CARD)
         if openchat_url:
-            st.link_button("오픈채팅 →", openchat_url, type="primary", use_container_width=True)
+            st.link_button("오픈채팅 →", openchat_url, use_container_width=True)
         else:
             st.button("준비중", disabled=True, use_container_width=True, key="kakao_disabled")
 
