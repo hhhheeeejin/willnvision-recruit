@@ -356,10 +356,10 @@ with tab2:
             
             col1, col2 = st.columns(2)
             new_salary = col1.text_input("급여 *", placeholder="예: 월 250만원")
-            new_hours = col2.text_input("근무시간", placeholder="예: 09-18시")
+            new_hours = col2.text_input("근무시간", placeholder="예: 09-18시", help="대시(-) 사용 권장. ~ 사용시 취소선 됨")
             
             col1, col2 = st.columns(2)
-            new_days = col1.text_input("근무요일", placeholder="예: 월-금")
+            new_days = col1.text_input("근무요일", placeholder="예: 월-금", help="대시(-) 사용 권장")
             new_education = col2.text_input("교육 일정", placeholder="예: 5/1부터 5일")
             
             new_features = st.text_input("특징", placeholder="예: 신입가능")
@@ -502,10 +502,10 @@ with tab2:
                     
                     col1, col2 = st.columns(2)
                     ed_salary = col1.text_input("급여", value=job.get('salary') or "", key=f"job_sal_{job['id']}")
-                    ed_hours = col2.text_input("근무시간", value=job.get('work_hours') or "", key=f"job_hrs_{job['id']}")
+                    ed_hours = col2.text_input("근무시간", value=job.get('work_hours') or "", key=f"job_hrs_{job['id']}", help="대시(-) 사용 권장")
                     
                     col1, col2 = st.columns(2)
-                    ed_days = col1.text_input("근무요일", value=job.get('work_days') or "", key=f"job_days_{job['id']}")
+                    ed_days = col1.text_input("근무요일", value=job.get('work_days') or "", key=f"job_days_{job['id']}", help="대시(-) 사용 권장")
                     ed_education = col2.text_input("교육", value=job.get('education_period') or "", key=f"job_edu_{job['id']}")
                     
                     ed_features = st.text_input("특징", value=job.get('features') or "", key=f"job_feat_{job['id']}")
@@ -836,7 +836,7 @@ with tab4:
             new_answer = st.text_area("답변 *")
             
             col1, col2 = st.columns(2)
-            new_show_faq = col1.checkbox("메인 FAQ에 표시", value=False, help="메인 페이지에 자주 묻는 질문으로 표시")
+            new_show_faq = col1.checkbox("메인 FAQ에 표시", value=False, help="현재는 메인페이지 FAQ 섹션 비활성화 상태")
             new_active = col2.checkbox("활성화", value=True)
             
             submitted = st.form_submit_button("💾 등록", type="primary", use_container_width=True)
@@ -907,7 +907,7 @@ with tab4:
                         st.rerun()
 
 # =============================================================
-# TAB 5: 사이트 설정
+# TAB 5: 사이트 설정 (출근거리 설정 추가!)
 # =============================================================
 with tab5:
     st.subheader("⚙️ 사이트 설정")
@@ -946,6 +946,31 @@ with tab5:
             value=settings.get('notice_text', ''),
             height=120,
         )
+        
+        st.divider()
+        st.markdown("### 🚇 출근거리 탭 설정")
+        st.caption("출근거리 검색 화면의 문구와 빠른 선택 버튼을 자유롭게 변경할 수 있어요!")
+        
+        new_commute_placeholder = st.text_input(
+            "출발지 입력 안내 문구 (placeholder)",
+            value=settings.get('commute_input_placeholder', '집 주소나 지하철역을 입력해주세요'),
+            help="출발지 입력칸이 비었을 때 표시되는 회색 안내 문구"
+        )
+        
+        new_commute_quick_label = st.text_input(
+            "빠른 선택 라벨",
+            value=settings.get('commute_quick_label', '🚇 빠른 선택'),
+            help="출발지 빠른 선택 버튼 위에 표시되는 텍스트"
+        )
+        
+        st.markdown("**🎯 빠른 선택 출발지 (4개)**")
+        st.caption("자주 검색되는 출발지를 등록하세요. 사용자가 클릭만 하면 바로 입력됩니다.")
+        col1, col2 = st.columns(2)
+        new_commute_quick_1 = col1.text_input("빠른 선택 1", value=settings.get('commute_quick_1', '강남역'))
+        new_commute_quick_2 = col2.text_input("빠른 선택 2", value=settings.get('commute_quick_2', '홍대입구역'))
+        col1, col2 = st.columns(2)
+        new_commute_quick_3 = col1.text_input("빠른 선택 3", value=settings.get('commute_quick_3', '서울역'))
+        new_commute_quick_4 = col2.text_input("빠른 선택 4", value=settings.get('commute_quick_4', '잠실역'))
         
         st.divider()
         st.markdown("### 🤖 챗봇 설정")
@@ -995,6 +1020,12 @@ with tab5:
                 'kakao_openchat_url': new_openchat,
                 'office_address': new_address,
                 'notice_text': new_notice,
+                'commute_input_placeholder': new_commute_placeholder,
+                'commute_quick_label': new_commute_quick_label,
+                'commute_quick_1': new_commute_quick_1,
+                'commute_quick_2': new_commute_quick_2,
+                'commute_quick_3': new_commute_quick_3,
+                'commute_quick_4': new_commute_quick_4,
                 'chatbot_name': new_bot_name,
                 'chatbot_emoji': new_bot_emoji,
                 'chatbot_greeting': new_greeting,
