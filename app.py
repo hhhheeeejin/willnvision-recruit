@@ -136,7 +136,7 @@ bot_thinking = settings.get('chatbot_thinking_msg', '윌비가 생각 중이에�
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# ============ CSS (버튼 강제 통일) ============
+# ============ CSS ============
 CUSTOM_CSS = """
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet">
 <style>
@@ -245,17 +245,12 @@ section.main { scroll-behavior: auto !important; }
     margin: 6px 0 !important;
 }
 
-/* ====================================
-   🎯 모든 버튼 강제 통일 (크기·색·정렬)
-   ==================================== */
-
-/* 모든 버튼 컨테이너 */
+/* 🎯 모든 버튼 강제 통일 */
 .stButton, .stLinkButton, [data-testid="stLinkButton"] {
     height: 44px !important;
     width: 100% !important;
 }
 
-/* 버튼 본체 (기본 스타일) */
 .stButton > button,
 .stLinkButton > a,
 .stLinkButton > a > button,
@@ -286,7 +281,6 @@ section.main { scroll-behavior: auto !important; }
     margin: 0 !important;
 }
 
-/* 🔑 LinkButton의 a 태그 - 직접 스타일 적용 (이게 핵심!) */
 .stLinkButton > a {
     text-decoration: none !important;
     background: white !important;
@@ -311,7 +305,6 @@ section.main { scroll-behavior: auto !important; }
     border-color: #4285F4 !important;
 }
 
-/* LinkButton 내부 button은 투명하게 */
 .stLinkButton > a > button {
     background: transparent !important;
     border: none !important;
@@ -322,7 +315,6 @@ section.main { scroll-behavior: auto !important; }
     margin: 0 !important;
 }
 
-/* 🎯 Primary 버튼 (파란색 통일) */
 .stButton > button[kind="primary"],
 [data-testid="baseButton-primary"],
 [data-testid="baseButton-primaryFormSubmit"] {
@@ -338,7 +330,6 @@ section.main { scroll-behavior: auto !important; }
     border-color: #1E40AF !important;
 }
 
-/* 🎯 Secondary 버튼 (흰색 통일) */
 .stButton > button[kind="secondary"],
 [data-testid="baseButton-secondary"],
 [data-testid="baseButton-secondaryFormSubmit"] {
@@ -354,7 +345,6 @@ section.main { scroll-behavior: auto !important; }
     border-color: #4285F4 !important;
 }
 
-/* 🎯 모든 버튼 텍스트 중앙 정렬 강제 */
 .stButton > button > div,
 .stLinkButton > a > button > div,
 .stButton > button p,
@@ -378,6 +368,46 @@ section.main { scroll-behavior: auto !important; }
     border: 2px solid #DBEAFE !important;
     background: white !important;
     color: #1E293B !important;
+}
+
+/* 🎯 챗봇 입력창 강조 (가볍게 - 진한 테두리) */
+[data-testid="stChatInput"] {
+    border: 2.5px solid #2563EB !important;
+    border-radius: 14px !important;
+    background: white !important;
+}
+
+[data-testid="stChatInput"] > div {
+    background: white !important;
+    border: none !important;
+}
+
+[data-testid="stChatInput"] textarea {
+    color: #1E293B !important;
+    font-size: 0.9rem !important;
+    font-weight: 500 !important;
+}
+
+[data-testid="stChatInput"] textarea::placeholder {
+    color: #64748B !important;
+    font-weight: 500 !important;
+    opacity: 1 !important;
+}
+
+[data-testid="stChatInput"] button {
+    background: #2563EB !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+}
+
+[data-testid="stChatInput"] button:hover {
+    background: #1E40AF !important;
+}
+
+[data-testid="stChatInput"] button svg {
+    fill: white !important;
+    color: white !important;
 }
 
 .cute-greeting {
@@ -478,6 +508,14 @@ section.main { scroll-behavior: auto !important; }
     .stTextArea > div > div > textarea {
         background: white !important; color: #1E293B !important;
     }
+    [data-testid="stChatInput"] {
+        background: white !important;
+        border: 2.5px solid #2563EB !important;
+    }
+    [data-testid="stChatInput"] textarea {
+        background: white !important;
+        color: #1E293B !important;
+    }
     .stLinkButton > a {
         background: white !important;
         color: #1E40AF !important;
@@ -527,9 +565,13 @@ else:
             if job.get('salary'):
                 detail_lines.append(f"💰 {job.get('salary')}")
             if job.get('work_hours') or job.get('work_days'):
-                detail_lines.append(f"⏰ {job.get('work_hours', '')} · {job.get('work_days', '')}")
+                # 마크다운 취소선(~) 자동 제거
+                wh = (job.get('work_hours', '') or '').replace('~', '-')
+                wd = (job.get('work_days', '') or '').replace('~', '-')
+                detail_lines.append(f"⏰ {wh} · {wd}")
             if job.get('education_period'):
-                detail_lines.append(f"📅 교육 {job['education_period']}")
+                ep = (job.get('education_period', '') or '').replace('~', '-')
+                detail_lines.append(f"📅 교육 {ep}")
             if job.get('subway_station'):
                 detail_lines.append(f"🚇 {job.get('subway_line', '')} {job['subway_station']}")
             elif job.get('centers') and job['centers'].get('subway_info'):
@@ -729,6 +771,14 @@ if st.session_state.active_tab == "chat":
 elif st.session_state.active_tab == "distance":
     st.markdown("#### 🚇 출근 경로 확인")
 
+    # 관리자 설정에서 가져오기 (없으면 기본값)
+    placeholder_text = settings.get('commute_input_placeholder', '집 주소나 지하철역을 입력해주세요')
+    quick_label = settings.get('commute_quick_label', '🚇 빠른 선택')
+    quick_1 = settings.get('commute_quick_1', '강남역')
+    quick_2 = settings.get('commute_quick_2', '홍대입구역')
+    quick_3 = settings.get('commute_quick_3', '서울역')
+    quick_4 = settings.get('commute_quick_4', '잠실역')
+
     GUIDE_BOX = (
         '<div style="background: #EFF6FF; '
         'padding: 0.8rem 1rem; border-radius: 10px; margin-bottom: 0.8rem; '
@@ -743,14 +793,14 @@ elif st.session_state.active_tab == "distance":
     st.markdown("**출발지 입력**")
     start_address = st.text_input(
         "출발지",
-        placeholder="예: 고양시 호수로 336, 강남역",
+        placeholder=placeholder_text,
         label_visibility="collapsed",
         key="start_addr",
     )
 
-    st.caption("👇 자주 찾는 출발지")
+    st.caption(quick_label)
     quick_cols = st.columns(4)
-    quick_stations = ["강남역", "홍대입구역", "서울역", "잠실역"]
+    quick_stations = [quick_1, quick_2, quick_3, quick_4]
     for idx, loc in enumerate(quick_stations):
         with quick_cols[idx]:
             if st.button(loc, key=f"qa_{idx}", use_container_width=True):
@@ -943,7 +993,7 @@ elif st.session_state.active_tab == "distance":
 
 
 # ============================================
-# 탭 3: 지원 문의
+# 탭 3: 지원 문의 (박스 컴팩트)
 # ============================================
 elif st.session_state.active_tab == "contact":
     st.markdown("#### 🙋 지원 문의")
@@ -954,11 +1004,11 @@ elif st.session_state.active_tab == "contact":
     with col1:
         KAKAO_CARD = (
             '<div style="background: #FEF3C7; '
-            'padding: 1.1rem; border-radius: 12px; text-align: center; '
-            'border: 1px solid #FCD34D;">'
-            '<div style="font-size: 2.2rem;">💬</div>'
-            '<div style="font-weight: 700; margin-top: 0.2rem; color: #92400E;">카카오톡</div>'
-            '<div style="font-size: 0.72rem; color: #B45309; font-weight: 500;">빠른 답변</div>'
+            'padding: 0.7rem; border-radius: 10px; text-align: center; '
+            'border: 1px solid #FCD34D; margin-bottom: 8px;">'
+            '<div style="font-size: 1.5rem;">💬</div>'
+            '<div style="font-weight: 700; margin-top: 0.1rem; color: #92400E; font-size: 0.85rem;">카카오톡</div>'
+            '<div style="font-size: 0.65rem; color: #B45309; font-weight: 500;">빠른 답변</div>'
             '</div>'
         )
         st.html(KAKAO_CARD)
@@ -970,11 +1020,11 @@ elif st.session_state.active_tab == "contact":
     with col2:
         PHONE_CARD = (
             '<div style="background: #DBEAFE; '
-            'padding: 1.1rem; border-radius: 12px; text-align: center; '
-            'border: 1px solid #93C5FD;">'
-            '<div style="font-size: 2.2rem;">📞</div>'
-            '<div style="font-weight: 700; margin-top: 0.2rem; color: #1E40AF;">전화</div>'
-            '<div style="font-size: 0.72rem; color: #2563EB; font-weight: 500;">즉시 상담</div>'
+            'padding: 0.7rem; border-radius: 10px; text-align: center; '
+            'border: 1px solid #93C5FD; margin-bottom: 8px;">'
+            '<div style="font-size: 1.5rem;">📞</div>'
+            '<div style="font-weight: 700; margin-top: 0.1rem; color: #1E40AF; font-size: 0.85rem;">전화</div>'
+            '<div style="font-size: 0.65rem; color: #2563EB; font-weight: 500;">즉시 상담</div>'
             '</div>'
         )
         st.html(PHONE_CARD)
