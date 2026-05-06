@@ -42,7 +42,7 @@ st.title("🔐 윌앤비전 채용 관리자")
 st.caption(f"마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
 
 
-# ============ 다음 우편번호 API 컴포넌트 ============
+# ============ 다음 우편번호 API ============
 def daum_postcode_widget():
     return """
     <!DOCTYPE html>
@@ -52,38 +52,22 @@ def daum_postcode_widget():
         <style>
             body { font-family: 'Pretendard', sans-serif; margin: 0; padding: 10px; background: white; }
             .search-btn {
-                background: #2563EB;
-                color: white;
-                border: none;
-                padding: 12px 20px;
-                border-radius: 10px;
-                font-weight: 700;
-                font-size: 14px;
-                cursor: pointer;
-                width: 100%;
-                margin-bottom: 10px;
+                background: #2563EB; color: white; border: none;
+                padding: 12px 20px; border-radius: 10px;
+                font-weight: 700; font-size: 14px; cursor: pointer;
+                width: 100%; margin-bottom: 10px;
             }
             .search-btn:hover { background: #1E40AF; }
             .result-box {
-                background: #F1F5F9;
-                padding: 12px;
-                border-radius: 10px;
-                margin-top: 10px;
-                font-size: 13px;
-                color: #1E293B;
-                line-height: 1.6;
-                display: none;
+                background: #F1F5F9; padding: 12px; border-radius: 10px;
+                margin-top: 10px; font-size: 13px; color: #1E293B;
+                line-height: 1.6; display: none;
             }
             .result-box.show { display: block; }
             .result-label { font-weight: 700; color: #1E40AF; margin-bottom: 4px; }
             .copy-info {
-                background: #FEF3C7;
-                padding: 10px;
-                border-radius: 8px;
-                margin-top: 10px;
-                font-size: 12px;
-                color: #92400E;
-                line-height: 1.5;
+                background: #FEF3C7; padding: 10px; border-radius: 8px;
+                margin-top: 10px; font-size: 12px; color: #92400E; line-height: 1.5;
             }
         </style>
     </head>
@@ -91,7 +75,6 @@ def daum_postcode_widget():
         <button class="search-btn" onclick="execDaumPostcode()">
             🔍 주소 검색하기 (다음 우편번호 API)
         </button>
-        
         <div id="result" class="result-box">
             <div class="result-label">📍 검색 결과</div>
             <div id="postcode"></div>
@@ -101,7 +84,6 @@ def daum_postcode_widget():
                 💡 위 주소를 아래 입력 칸에 복사·붙여넣기 하세요!
             </div>
         </div>
-
         <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
         <script>
             function execDaumPostcode() {
@@ -109,13 +91,11 @@ def daum_postcode_widget():
                     oncomplete: function(data) {
                         var addr = '';
                         var extraAddr = '';
-                        
                         if (data.userSelectedType === 'R') {
                             addr = data.roadAddress;
                         } else {
                             addr = data.jibunAddress;
                         }
-                        
                         if (data.userSelectedType === 'R') {
                             if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) {
                                 extraAddr += data.bname;
@@ -127,7 +107,6 @@ def daum_postcode_widget():
                                 extraAddr = ' (' + extraAddr + ')';
                             }
                         }
-                        
                         document.getElementById('postcode').innerHTML = '<b>우편번호:</b> ' + data.zonecode;
                         document.getElementById('address').innerHTML = '<b>주소:</b> ' + addr + extraAddr;
                         document.getElementById('extraAddress').innerHTML = '<b>참고:</b> ' + (data.buildingName || '없음');
@@ -211,7 +190,6 @@ with tab1:
     
     st.divider()
     
-    # 출근거리 지역 통계
     st.subheader("🚇 출근거리 검색 지역 통계")
     st.caption("어느 지역에서 채용 문의가 많은지 추정 가능")
     
@@ -356,7 +334,7 @@ with tab2:
             
             col1, col2 = st.columns(2)
             new_salary = col1.text_input("급여 *", placeholder="예: 월 250만원")
-            new_hours = col2.text_input("근무시간", placeholder="예: 09-18시", help="대시(-) 사용 권장. ~ 사용시 취소선 됨")
+            new_hours = col2.text_input("근무시간", placeholder="예: 09-18시", help="대시(-) 사용 권장")
             
             col1, col2 = st.columns(2)
             new_days = col1.text_input("근무요일", placeholder="예: 월-금", help="대시(-) 사용 권장")
@@ -749,7 +727,6 @@ with tab3:
                         except Exception as e:
                             st.error(f"실패: {e}")
                 
-                # 센터별 FAQ
                 st.markdown("---")
                 st.markdown(f"#### ❓ {c['name']} 전용 FAQ")
                 st.caption("이 센터에만 해당하는 질문-답변을 등록하세요")
@@ -824,7 +801,7 @@ with tab3:
 # =============================================================
 with tab4:
     st.subheader("❓ 공통 FAQ 관리")
-    st.caption("모든 센터에 해당하는 공통 질문-답변. 센터별 FAQ는 '🏢 센터 관리'에서!")
+    st.caption("⚡ FAQ에 등록된 질문과 비슷한 질문이 들어오면, AI 호출 없이 즉시 답변! (비용 절감)")
     
     with st.expander("➕ 새 FAQ 추가"):
         with st.form("new_faq_form", clear_on_submit=True):
@@ -832,8 +809,8 @@ with tab4:
             new_category = col1.selectbox("카테고리", ["회사소개", "담당자", "지원방법", "근무조건", "기타"])
             new_order = col2.number_input("표시 순서", min_value=0, value=99)
             
-            new_question = st.text_input("질문 *", placeholder="예: 재택근무 가능?")
-            new_answer = st.text_area("답변 *")
+            new_question = st.text_input("질문 *", placeholder="예: 신입도 가능한가요?")
+            new_answer = st.text_area("답변 *", placeholder="예: 네! 신입 환영입니다. 5일 OJT 교육 제공해드려요.")
             
             col1, col2 = st.columns(2)
             new_show_faq = col1.checkbox("메인 FAQ에 표시", value=False, help="현재는 메인페이지 FAQ 섹션 비활성화 상태")
@@ -907,7 +884,7 @@ with tab4:
                         st.rerun()
 
 # =============================================================
-# TAB 5: 사이트 설정 (출근거리 설정 추가!)
+# TAB 5: 사이트 설정 (회사 통합 메모 추가!)
 # =============================================================
 with tab5:
     st.subheader("⚙️ 사이트 설정")
@@ -946,6 +923,53 @@ with tab5:
             value=settings.get('notice_text', ''),
             height=120,
         )
+        
+        st.divider()
+        st.markdown("### 📝 회사 통합 메모 (AI 챗봇 참조용)")
+        st.caption("🎯 챗봇이 답변할 때 이 메모를 참고해서 답변합니다. 회사 정보를 자유롭게 적어주세요!")
+        st.info(
+            "💡 **사용 팁**\n\n"
+            "- FAQ에 등록되지 않은 질문이 들어오면, AI가 이 메모를 참고해서 답변해요\n"
+            "- 카테고리별로 정리하면 AI가 더 정확하게 답변해요\n"
+            "- 예시: [복리후생] [근무환경] [교육] [면접 절차] 등\n"
+            "- 너무 길면 비용이 늘어나요 (1500자 권장)"
+        )
+        
+        new_company_memo = st.text_area(
+            "회사 통합 메모",
+            value=settings.get('company_memo', ''),
+            height=300,
+            placeholder="""[회사 소개]
+- 윌앤비전은 콜센터 전문 업체
+- 주요 고객사: 통신사, 카드사
+
+[복리후생]
+- 4대보험 가입
+- 명절 상여금
+- 생일 휴가
+- 경조사비 지원
+
+[근무 환경]
+- 평균 연령 30대
+- 수평적 분위기
+- 휴게실 완비
+
+[교육 시스템]
+- 입사 후 5일 OJT 교육
+- 멘토 1:1 매칭
+
+[기타]
+- 비즈니스 캐주얼
+- 야근 거의 없음""",
+            label_visibility="collapsed",
+        )
+        
+        if new_company_memo:
+            char_count = len(new_company_memo)
+            if char_count > 1500:
+                st.warning(f"⚠️ {char_count}자 (1500자 초과 — 일부만 사용됨)")
+            else:
+                st.caption(f"📊 {char_count}자 / 1500자")
         
         st.divider()
         st.markdown("### 🚇 출근거리 탭 설정")
@@ -1020,6 +1044,7 @@ with tab5:
                 'kakao_openchat_url': new_openchat,
                 'office_address': new_address,
                 'notice_text': new_notice,
+                'company_memo': new_company_memo,
                 'commute_input_placeholder': new_commute_placeholder,
                 'commute_quick_label': new_commute_quick_label,
                 'commute_quick_1': new_commute_quick_1,
