@@ -9,6 +9,7 @@ from utils.db import (
     get_active_jobs, get_knowledge_base, save_conversation,
     get_active_centers, get_center_faqs,
     save_commute_search,
+    find_matching_faq,
 )
 
 st.set_page_config(
@@ -56,7 +57,8 @@ def load_center_faqs(center_id):
     return get_center_faqs(center_id)
 
 @st.cache_data(ttl=1800)
-def build_cached_system_prompt(bot_name, manager_name, manager_phone, tone):
+def build_cached_system_prompt(bot_name, manager_name, manager_phone, tone, company_memo):
+    """시스템 프롬프트 캐싱 (회사 메모 포함)"""
     active_jobs_list = load_active_jobs()
     kb = load_knowledge_base()
     centers_list = load_active_centers()
@@ -100,14 +102,20 @@ def build_cached_system_prompt(bot_name, manager_name, manager_phone, tone):
         'formal': '정중하고 격식있게'
     }.get(tone, '친근하게')
 
+    # 회사 메모 추가 (있으면)
+    memo_section = ""
+    if company_memo and company_memo.strip():
+        memo_section = f"\n\n[회사 추가 정보 - 자유 메모]\n{company_memo[:1500]}\n"  # 1500자로 제한
+
     return (
         f"당신은 윌앤비전 채용팀 AI 상담사 '{bot_name}'. {tone_guide}.\n\n"
         f"[공고]\n{job_info}\n\n"
         f"[FAQ]\n{kb_info}\n\n"
-        f"[센터]\n{centers_text}\n\n"
+        f"[센터]\n{centers_text}"
+        f"{memo_section}\n"
         f"[담당자] {manager_name} / {manager_phone}\n\n"
         f"[규칙]\n"
-        f"1. 위 정보로만 답변\n"
+        f"1. 위 정보로만 답변 (회사 추가 정보도 적극 활용)\n"
         f"2. 답변 끝에 '더 궁금한 점 있으세요? 😊'\n"
         f"3. 짧게, 모바일 친화적으로 (3~5줄)\n"
         f"4. 출퇴근 질문은 4가지 교통수단 대략 시간 안내 + '정확한 건 카카오맵·네이버지도, 하단 출근거리 메뉴에서 확인 가능'\n"
@@ -125,6 +133,7 @@ manager_phone = settings.get('manager_phone', '010-9467-6139')
 default_form_url = settings.get('default_google_form_url', '')
 openchat_url = settings.get('kakao_openchat_url', '')
 tone = settings.get('chatbot_tone', 'friendly')
+company_memo = settings.get('company_memo', '')  # 🆕 회사 메모
 
 bot_emoji = settings.get('chatbot_emoji', '🤖')
 bot_name = settings.get('chatbot_name', '윌비봇')
@@ -370,7 +379,7 @@ section.main { scroll-behavior: auto !important; }
     color: #1E293B !important;
 }
 
-/* 🎯 챗봇 입력창 강조 (가볍게 - 진한 테두리) */
+/* 🎯 챗봇 입력창 강조 */
 [data-testid="stChatInput"] {
     border: 2.5px solid #2563EB !important;
     border-radius: 14px !important;
@@ -565,7 +574,6 @@ else:
             if job.get('salary'):
                 detail_lines.append(f"💰 {job.get('salary')}")
             if job.get('work_hours') or job.get('work_days'):
-                # 마크다운 취소선(~) 자동 제거
                 wh = (job.get('work_hours', '') or '').replace('~', '-')
                 wd = (job.get('work_days', '') or '').replace('~', '-')
                 detail_lines.append(f"⏰ {wh} · {wd}")
@@ -657,7 +665,7 @@ with tab_cols[3]:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ============================================
-# 탭 1: AI 상담사
+# 탭 1: AI 상담사 (FAQ 매칭 + 회사 메모 통합)
 # ============================================
 if st.session_state.active_tab == "chat":
 
@@ -718,30 +726,56 @@ if st.session_state.active_tab == "chat":
         st.session_state.messages.append({"role": "user", "content": user_input})
 
         try:
-            system_prompt = build_cached_system_prompt(bot_name, manager_name, manager_phone, tone)
-            chat_history = [{"role": "system", "content": system_prompt}]
-            chat_history.extend(st.session_state.messages[-6:])
+            # 🎯 1단계: FAQ 매칭 시도 (비용 절감!)
+            faq_match = find_matching_faq(user_input, threshold=0.4)
 
-            with st.spinner(bot_thinking):
-                response = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=chat_history,
-                    temperature=0.7,
-                    max_tokens=400,
+            if faq_match:
+                # FAQ 매칭됨! AI 호출 안 함 (비용 0원, 즉시 답변)
+                answer = (
+                    f"{faq_match['answer']}\n\n"
+                    f"더 궁금한 점 있으세요? 😊"
                 )
 
-            answer = response.choices[0].message.content
-            st.session_state.messages.append({"role": "assistant", "content": answer})
+                st.session_state.messages.append({"role": "assistant", "content": answer})
 
-            needs_human = "담당자" in answer or manager_phone in answer
-            save_conversation(
-                session_id=st.session_state.session_id,
-                question=user_input,
-                answer=answer,
-                related_job_id=st.session_state.get('preset_job_id'),
-                needs_human=needs_human,
-            )
-            st.rerun()
+                save_conversation(
+                    session_id=st.session_state.session_id,
+                    question=user_input,
+                    answer=answer,
+                    related_job_id=st.session_state.get('preset_job_id'),
+                    needs_human=False,
+                )
+                st.rerun()
+
+            else:
+                # 🤖 2단계: FAQ 매칭 안 되면 AI 호출 (회사 메모도 같이 참고)
+                system_prompt = build_cached_system_prompt(
+                    bot_name, manager_name, manager_phone, tone, company_memo
+                )
+                chat_history = [{"role": "system", "content": system_prompt}]
+                chat_history.extend(st.session_state.messages[-6:])
+
+                with st.spinner(bot_thinking):
+                    response = client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=chat_history,
+                        temperature=0.7,
+                        max_tokens=400,
+                    )
+
+                answer = response.choices[0].message.content
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+
+                needs_human = "담당자" in answer or manager_phone in answer
+                save_conversation(
+                    session_id=st.session_state.session_id,
+                    question=user_input,
+                    answer=answer,
+                    related_job_id=st.session_state.get('preset_job_id'),
+                    needs_human=needs_human,
+                )
+                st.rerun()
+
         except Exception as e:
             st.error(f"오류 발생. {manager_phone}로 문의해주세요.")
 
@@ -771,7 +805,6 @@ if st.session_state.active_tab == "chat":
 elif st.session_state.active_tab == "distance":
     st.markdown("#### 🚇 출근 경로 확인")
 
-    # 관리자 설정에서 가져오기 (없으면 기본값)
     placeholder_text = settings.get('commute_input_placeholder', '집 주소나 지하철역을 입력해주세요')
     quick_label = settings.get('commute_quick_label', '🚇 빠른 선택')
     quick_1 = settings.get('commute_quick_1', '강남역')
@@ -993,7 +1026,7 @@ elif st.session_state.active_tab == "distance":
 
 
 # ============================================
-# 탭 3: 지원 문의 (박스 컴팩트)
+# 탭 3: 지원 문의
 # ============================================
 elif st.session_state.active_tab == "contact":
     st.markdown("#### 🙋 지원 문의")
