@@ -429,3 +429,162 @@ def get_commute_region_stats():
         return sorted_regions
     except Exception as e:
         return []
+
+# ============ FAQ 매칭 (비용 절감) ============
+
+def find_matching_faq(user_question, threshold=0.4):
+    """
+    사용자 질문과 FAQ를 매칭해서 답변 찾기
+    매칭되면 답변 반환, 없으면 None
+    
+    threshold: 0.0~1.0 (높을수록 엄격)
+    - 0.3: 느슨 (자주 매칭됨, 잘못 매칭될 수 있음)
+    - 0.4: 균형 ⭐ 기본값
+    - 0.5: 엄격 (확실한 것만 매칭)
+    """
+    if not user_question:
+        return None
+    
+    try:
+        all_faqs = []
+        sb = get_supabase()
+        
+        # 공통 FAQ
+        try:
+            kb_res = sb.table("knowledge_base").select("question, answer").eq("is_active", True).execute()
+            for kb in (kb_res.data or []):
+                all_faqs.append({
+                    "question": kb.get("question", ""),
+                    "answer": kb.get("answer", ""),
+                    "source": "FAQ"
+                })
+        except Exception as e:
+            print(f"공통 FAQ 로드 실패: {e}")
+        
+        # 센터별 FAQ
+        try:
+            cf_res = sb.table("center_faqs").select("question, answer").eq("is_active", True).execute()
+            for cf in (cf_res.data or []):
+                all_faqs.append({
+                    "question": cf.get("question", ""),
+                    "answer": cf.get("answer", ""),
+                    "source": "센터FAQ"
+                })
+        except Exception as e:
+            print(f"센터 FAQ 로드 실패: {e}")
+        
+        if not all_faqs:
+            return None
+        
+        # 사용자 질문 정규화
+        user_q_normalized = normalize_text(user_question)
+        if not user_q_normalized or len(user_q_normalized) < 2:
+            return None
+        
+        # 각 FAQ와 유사도 계산
+        best_match = None
+        best_score = 0
+        
+        for faq in all_faqs:
+            faq_q = normalize_text(faq["question"])
+            if not faq_q:
+                continue
+            
+            score = calculate_similarity(user_q_normalized, faq_q)
+            
+            if score > best_score:
+                best_score = score
+                best_match = faq
+        
+        # 임계값 이상이면 매칭 성공
+        if best_score >= threshold and best_match:
+            return {
+                "question": best_match["question"],
+                "answer": best_match["answer"],
+                "score": round(best_score, 2),
+                "source": best_match["source"]
+            }
+        
+        return None
+        
+    except Exception as e:
+        print(f"FAQ 매칭 실패: {e}")
+        return None
+
+
+def normalize_text(text):
+    """텍스트 정규화 - 공백/특수문자 제거 + 소문자"""
+    if not text:
+        return ""
+    import re
+    text = re.sub(r'[^\w가-힣]', ' ', text)
+    text = re.sub(r'\s+', ' ', text).strip().lower()
+    return text
+
+
+def calculate_similarity(text1, text2):
+    """두 텍스트의 유사도 계산 (0.0 ~ 1.0)"""
+    if not text1 or not text2:
+        return 0
+    
+    # 한국어 동의어 매핑
+    synonyms = {
+        '급여': ['월급', '연봉', '돈', '페이', '시급'],
+        '월급': ['급여', '연봉', '돈', '페이'],
+        '신입': ['신규', '경력없음', '미경험'],
+        '교육': ['훈련', '연수', '트레이닝', 'OJT', '오제이티'],
+        '근무시간': ['일하는시간', '업무시간', '시간'],
+        '근무': ['일', '업무', '근로'],
+        '주차': ['파킹', '차'],
+        '재택': ['홈', '집', '원격'],
+        '복지': ['혜택', '베네핏', '복리후생'],
+        '면접': ['인터뷰'],
+        '지원': ['신청', '응모'],
+        '나이': ['연령'],
+        '학력': ['학벌', '졸업'],
+        '인센티브': ['수당', '보너스', '성과급'],
+        '휴게실': ['쉴공간', '쉬는곳'],
+        '점심': ['식사', '런치'],
+        '교통': ['출퇴근', '거리'],
+        '센터': ['사무실', '회사', '근무지'],
+        '연락처': ['번호', '전화', '담당자'],
+        '경력': ['이력', '경험'],
+        '분위기': ['문화', '동료', '사람들'],
+        '간식': ['음료', '커피', '다과'],
+    }
+    
+    words1 = set(text1.split())
+    words2 = set(text2.split())
+    
+    if not words1 or not words2:
+        return 0
+    
+    # 직접 일치
+    direct_match = len(words1 & words2)
+    
+    # 동의어 + 부분 일치
+    synonym_match = 0
+    for w1 in words1:
+        if w1 in words2:
+            continue
+        # 동의어 사전 확인
+        for key, syns in synonyms.items():
+            if w1 == key or w1 in syns:
+                check_words = [key] + syns
+                for w2 in words2:
+                    if w2 in check_words:
+                        synonym_match += 0.7
+                        break
+        # 부분 일치 (포함 관계)
+        for w2 in words2:
+            if w1 != w2 and (w1 in w2 or w2 in w1) and len(w1) >= 2:
+                synonym_match += 0.5
+    
+    total_match = direct_match + synonym_match
+    union_size = len(words1 | words2)
+    
+    if union_size == 0:
+        return 0
+    
+    similarity = total_match / union_size
+    return min(similarity, 1.0)
