@@ -2,6 +2,7 @@ import streamlit as st
 import uuid
 import urllib.parse
 import json
+import requests
 from openai import OpenAI
 from utils.db import (
     get_active_jobs_with_center,
@@ -58,7 +59,6 @@ def load_center_faqs(center_id):
 
 @st.cache_data(ttl=1800)
 def build_cached_system_prompt(bot_name, manager_name, manager_phone, tone, company_memo):
-    """시스템 프롬프트 캐싱 (회사 메모 포함)"""
     active_jobs_list = load_active_jobs()
     kb = load_knowledge_base()
     centers_list = load_active_centers()
@@ -74,7 +74,6 @@ def build_cached_system_prompt(bot_name, manager_name, manager_phone, tone, comp
             f"{j.get('features', '')}"
         )
     job_info = "\n".join(job_lines)
-
     kb_info = "\n".join([f"Q:{k.get('question','')} A:{k.get('answer','')}" for k in kb])
 
     center_info_lines = []
@@ -102,10 +101,9 @@ def build_cached_system_prompt(bot_name, manager_name, manager_phone, tone, comp
         'formal': '정중하고 격식있게'
     }.get(tone, '친근하게')
 
-    # 회사 메모 추가 (있으면)
     memo_section = ""
     if company_memo and company_memo.strip():
-        memo_section = f"\n\n[회사 추가 정보 - 자유 메모]\n{company_memo[:1500]}\n"  # 1500자로 제한
+        memo_section = f"\n\n[회사 추가 정보 - 자유 메모]\n{company_memo[:1500]}\n"
 
     return (
         f"당신은 윌앤비전 채용팀 AI 상담사 '{bot_name}'. {tone_guide}.\n\n"
@@ -122,6 +120,152 @@ def build_cached_system_prompt(bot_name, manager_name, manager_phone, tone, comp
         f"5. 개인정보 수집 금지"
     )
 
+# ============ 카카오 API 함수 ============
+def get_kakao_coords(address):
+    """주소 → 위경도 변환"""
+    kakao_key = st.secrets.get("KAKAO_REST_API_KEY", "")
+    if not kakao_key:
+        return None, None
+    url = "https://dapi.kakao.com/v2/local/search/address.json"
+    headers = {"Authorization": f"KakaoAK {kakao_key}"}
+    params = {"query": address}
+    try:
+        res = requests.get(url, headers=headers, params=params, timeout=5)
+        data = res.json()
+        docs = data.get("documents", [])
+        if docs:
+            return float(docs[0]["y"]), float(docs[0]["x"])
+        # 주소 검색 실패 시 키워드 검색 시도
+        url2 = "https://dapi.kakao.com/v2/local/search/keyword.json"
+        res2 = requests.get(url2, headers=headers, params={"query": address}, timeout=5)
+        data2 = res2.json()
+        docs2 = data2.get("documents", [])
+        if docs2:
+            return float(docs2[0]["y"]), float(docs2[0]["x"])
+    except Exception:
+        pass
+    return None, None
+
+def get_kakao_route(origin_lat, origin_lng, dest_lat, dest_lng, transport):
+    """카카오 모빌리티 경로 탐색 (자동차/도보)"""
+    kakao_key = st.secrets.get("KAKAO_REST_API_KEY", "")
+    headers = {"Authorization": f"KakaoAK {kakao_key}"}
+
+    try:
+        if transport == "car":
+            url = "https://apis-navi.kakaomobility.com/v1/directions"
+            params = {
+                "origin": f"{origin_lng},{origin_lat}",
+                "destination": f"{dest_lng},{dest_lat}",
+                "priority": "RECOMMEND",
+            }
+            res = requests.get(url, headers=headers, params=params, timeout=8)
+            data = res.json()
+            routes = data.get("routes", [])
+            if routes and routes[0].get("result_code") == 0:
+                duration = routes[0]["summary"]["duration"]  # 초
+                return duration
+        elif transport == "walk":
+            url = "https://apis-navi.kakaomobility.com/v1/directions"
+            params = {
+                "origin": f"{origin_lng},{origin_lat}",
+                "destination": f"{dest_lng},{dest_lat}",
+                "priority": "RECOMMEND",
+            }
+            # 도보는 직선거리로 계산 (카카오 도보 API는 별도)
+            import math
+            dlat = dest_lat - origin_lat
+            dlng = dest_lng - origin_lng
+            dist_km = math.sqrt(dlat**2 + dlng**2) * 111  # 대략 km
+            walk_min = int(dist_km / 4.5 * 60)  # 평균 도보 4.5km/h
+            return walk_min * 60  # 초로 반환
+    except Exception:
+        pass
+    return None
+
+def format_duration(seconds):
+    """초 → '약 X분' or '약 X시간 Y분' 형식"""
+    if seconds is None:
+        return None
+    minutes = round(seconds / 60)
+    if minutes < 60:
+        return f"약 {minutes}분"
+    else:
+        h = minutes // 60
+        m = minutes % 60
+        if m == 0:
+            return f"약 {h}시간"
+        return f"약 {h}시간 {m}분"
+
+def get_commute_times(start_address, center):
+    """출발지 → 센터 소요시간 계산 (카카오 API)"""
+    kakao_key = st.secrets.get("KAKAO_REST_API_KEY", "")
+    if not kakao_key:
+        return None
+
+    # 좌표 변환
+    origin_lat, origin_lng = get_kakao_coords(start_address)
+    dest_lat, dest_lng = get_kakao_coords(center.get("address", ""))
+
+    if not origin_lat or not dest_lat:
+        return None
+
+    import math
+    dlat = dest_lat - origin_lat
+    dlng = dest_lng - origin_lng
+    dist_km = math.sqrt(dlat**2 + dlng**2) * 111
+
+    headers = {"Authorization": f"KakaoAK {kakao_key}"}
+    results = {}
+
+    # 🚗 자동차
+    try:
+        url = "https://apis-navi.kakaomobility.com/v1/directions"
+        params = {
+            "origin": f"{origin_lng},{origin_lat}",
+            "destination": f"{dest_lng},{dest_lat}",
+            "priority": "RECOMMEND",
+        }
+        res = requests.get(url, headers=headers, params=params, timeout=8)
+        data = res.json()
+        routes = data.get("routes", [])
+        if routes and routes[0].get("result_code") == 0:
+            results["car"] = format_duration(routes[0]["summary"]["duration"])
+        else:
+            results["car"] = format_duration(int(dist_km / 40 * 3600))
+    except Exception:
+        results["car"] = format_duration(int(dist_km / 40 * 3600))
+
+    # 🚇 대중교통 (직선거리 기반 추정 - 카카오 대중교통 API는 유료)
+    transit_min = int(dist_km / 25 * 60) + 10  # 평균 속도 + 환승 시간
+    transit_min = max(10, transit_min)
+    results["transit"] = format_duration(transit_min * 60)
+
+    # 🚴 자전거 (평균 15km/h)
+    bike_min = int(dist_km / 15 * 60)
+    bike_min = max(5, bike_min)
+    results["bicycle"] = format_duration(bike_min * 60)
+
+    # 🚶 도보 (평균 4.5km/h)
+    walk_min = int(dist_km / 4.5 * 60)
+    walk_min = max(5, walk_min)
+    results["walk"] = format_duration(walk_min * 60)
+
+    # 팁 생성
+    subway_info = center.get("subway_info", "")
+    if subway_info:
+        results["tip"] = f"대중교통 이용 시 {subway_info} 이용을 추천해요!"
+    elif dist_km < 2:
+        results["tip"] = "가까운 거리예요! 도보나 자전거도 좋아요 🚴"
+    elif dist_km < 5:
+        results["tip"] = "대중교통이 가장 편리할 수 있어요 🚇"
+    else:
+        results["tip"] = "자차 이용 시 주차 가능 여부를 미리 확인해보세요! 🚗"
+
+    results["dist_km"] = round(dist_km, 1)
+
+    return results
+
 # ============ 설정 로드 ============
 settings = load_settings()
 hero_title = settings.get('hero_title', '윌앤비전 채용팀')
@@ -133,7 +277,7 @@ manager_phone = settings.get('manager_phone', '010-9467-6139')
 default_form_url = settings.get('default_google_form_url', '')
 openchat_url = settings.get('kakao_openchat_url', '')
 tone = settings.get('chatbot_tone', 'friendly')
-company_memo = settings.get('company_memo', '')  # 🆕 회사 메모
+company_memo = settings.get('company_memo', '')
 
 bot_emoji = settings.get('chatbot_emoji', '🤖')
 bot_name = settings.get('chatbot_name', '윌비봇')
@@ -254,7 +398,6 @@ section.main { scroll-behavior: auto !important; }
     margin: 6px 0 !important;
 }
 
-/* 🎯 모든 버튼 강제 통일 */
 .stButton, .stLinkButton, [data-testid="stLinkButton"] {
     height: 44px !important;
     width: 100% !important;
@@ -379,7 +522,6 @@ section.main { scroll-behavior: auto !important; }
     color: #1E293B !important;
 }
 
-/* 🎯 챗봇 입력창 강조 */
 [data-testid="stChatInput"] {
     border: 2.5px solid #2563EB !important;
     border-radius: 14px !important;
@@ -665,7 +807,7 @@ with tab_cols[3]:
 st.markdown("<br>", unsafe_allow_html=True)
 
 # ============================================
-# 탭 1: AI 상담사 (FAQ 매칭 + 회사 메모 통합)
+# 탭 1: AI 상담사
 # ============================================
 if st.session_state.active_tab == "chat":
 
@@ -726,18 +868,11 @@ if st.session_state.active_tab == "chat":
         st.session_state.messages.append({"role": "user", "content": user_input})
 
         try:
-            # 🎯 1단계: FAQ 매칭 시도 (비용 절감!)
             faq_match = find_matching_faq(user_input, threshold=0.4)
 
             if faq_match:
-                # FAQ 매칭됨! AI 호출 안 함 (비용 0원, 즉시 답변)
-                answer = (
-                    f"{faq_match['answer']}\n\n"
-                    f"더 궁금한 점 있으세요? 😊"
-                )
-
+                answer = f"{faq_match['answer']}\n\n더 궁금한 점 있으세요? 😊"
                 st.session_state.messages.append({"role": "assistant", "content": answer})
-
                 save_conversation(
                     session_id=st.session_state.session_id,
                     question=user_input,
@@ -746,9 +881,7 @@ if st.session_state.active_tab == "chat":
                     needs_human=False,
                 )
                 st.rerun()
-
             else:
-                # 🤖 2단계: FAQ 매칭 안 되면 AI 호출 (회사 메모도 같이 참고)
                 system_prompt = build_cached_system_prompt(
                     bot_name, manager_name, manager_phone, tone, company_memo
                 )
@@ -800,7 +933,7 @@ if st.session_state.active_tab == "chat":
 
 
 # ============================================
-# 탭 2: 출근 거리
+# 탭 2: 출근 거리 (카카오 API 적용)
 # ============================================
 elif st.session_state.active_tab == "distance":
     st.markdown("#### 🚇 출근 경로 확인")
@@ -838,8 +971,8 @@ elif st.session_state.active_tab == "distance":
         with quick_cols[idx]:
             if st.button(loc, key=f"qa_{idx}", use_container_width=True):
                 st.session_state['start_addr'] = loc
-                if 'commute_analysis' in st.session_state:
-                    del st.session_state['commute_analysis']
+                if 'commute_result' in st.session_state:
+                    del st.session_state['commute_result']
                 st.rerun()
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -863,8 +996,8 @@ elif st.session_state.active_tab == "distance":
                 key="dest_center",
                 label_visibility="collapsed"
             )
-            if prev_sel_id != sel_id and 'commute_analysis' in st.session_state:
-                del st.session_state['commute_analysis']
+            if prev_sel_id != sel_id and 'commute_result' in st.session_state:
+                del st.session_state['commute_result']
             selected_center = next(c for c in centers if c['id'] == sel_id)
 
         if start_address:
@@ -882,7 +1015,6 @@ elif st.session_state.active_tab == "distance":
             st.html(ROUTE_HEADER)
 
             st.markdown("**교통수단 선택**")
-
             sel_transport = st.session_state.get('sel_transport', 'transit')
 
             t_cols = st.columns(4)
@@ -898,15 +1030,14 @@ elif st.session_state.active_tab == "distance":
                     if st.button(label, key=f"tr_{key}", use_container_width=True,
                                  type="primary" if is_active else "secondary"):
                         st.session_state['sel_transport'] = key
+                        if 'commute_result' in st.session_state:
+                            del st.session_state['commute_result']
                         st.rerun()
 
             st.markdown("<br>", unsafe_allow_html=True)
 
-            if st.button("⏱️ 시간 확인하기",
-                         type="primary",
-                         use_container_width=True,
-                         key="check_time_btn"):
-                with st.spinner("분석 중... 🔍"):
+            if st.button("⏱️ 시간 확인하기", type="primary", use_container_width=True, key="check_time_btn"):
+                with st.spinner("카카오맵으로 경로 계산 중... 🗺️"):
                     try:
                         save_commute_search(
                             session_id=st.session_state.session_id,
@@ -915,112 +1046,103 @@ elif st.session_state.active_tab == "distance":
                             center_name=selected_center['name'],
                             transport_type=sel_transport,
                         )
-
-                        time_prompt = (
-                            f"출발: {start_address} → 도착: {selected_center['name']} ({selected_center.get('address', '')})\n"
-                            "한국 지리 기반으로 4가지 교통수단 시간 추정.\n"
-                            "JSON만 응답:\n"
-                            '{"car": "약 X분", "transit": "약 X분", "bicycle": "약 X시간", '
-                            '"walk": "약 X시간", "tip": "꿀팁 한 문장(50자)"}'
-                        )
-
-                        response = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[
-                                {"role": "system", "content": "한국 출퇴근 안내 전문가. JSON만 응답."},
-                                {"role": "user", "content": time_prompt}
-                            ],
-                            temperature=0.5,
-                            max_tokens=200,
-                            response_format={"type": "json_object"},
-                        )
-
-                        st.session_state['commute_analysis'] = response.choices[0].message.content
-                        st.rerun()
-
-                    except Exception as e:
-                        st.error(f"분석 오류: {e}")
-
-            if st.session_state.get('commute_analysis'):
-                try:
-                    result = json.loads(st.session_state['commute_analysis'])
-
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.markdown("##### ⏱️ 예상 소요시간")
-
-                    def time_card(key, emoji, label, time_text):
-                        is_selected = (key == sel_transport)
-                        if is_selected:
-                            return (
-                                '<div style="background: #2563EB; '
-                                'border-radius: 10px; padding: 10px; text-align: center;">'
-                                f'<div style="font-size: 1.3rem;">{emoji}</div>'
-                                f'<div style="font-size: 0.7rem; color: rgba(255,255,255,0.9); font-weight: 600; margin-top: 2px;">{label}</div>'
-                                f'<div style="font-size: 0.95rem; font-weight: 800; color: white; margin-top: 3px;">{time_text}</div>'
-                                '</div>'
-                            )
+                        result = get_commute_times(start_address, selected_center)
+                        if result:
+                            st.session_state['commute_result'] = result
                         else:
-                            return (
-                                '<div style="background: white; border: 2px solid #DBEAFE; '
-                                'border-radius: 10px; padding: 10px; text-align: center;">'
-                                f'<div style="font-size: 1.3rem;">{emoji}</div>'
-                                f'<div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 2px;">{label}</div>'
-                                f'<div style="font-size: 0.95rem; font-weight: 800; color: #2563EB; margin-top: 3px;">{time_text}</div>'
-                                '</div>'
-                            )
+                            st.error("주소를 찾을 수 없어요. 더 자세한 주소나 지하철역 이름으로 입력해보세요!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"오류가 발생했어요: {e}")
 
-                    TIMES_HTML = (
-                        '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px;">'
-                        + time_card("car", "🚗", "자동차", result.get("car", "-"))
-                        + time_card("transit", "🚇", "대중교통", result.get("transit", "-"))
-                        + time_card("bicycle", "🚴", "자전거", result.get("bicycle", "-"))
-                        + time_card("walk", "🚶", "도보", result.get("walk", "-"))
-                        + '</div>'
-                    )
-                    st.html(TIMES_HTML)
+            if st.session_state.get('commute_result'):
+                result = st.session_state['commute_result']
 
-                    tip = result.get('tip', '')
-                    if tip:
-                        TIP_HTML = (
-                            '<div style="background: #FEF3C7; '
-                            'padding: 9px 12px; border-radius: 10px; '
-                            'border-left: 3px solid #F59E0B; margin-bottom: 10px;">'
-                            f'<div style="font-size: 0.78rem; color: #78350F; line-height: 1.5;">'
-                            f'💡 {tip}</div></div>'
+                st.markdown("<br>", unsafe_allow_html=True)
+
+                # 거리 표시
+                dist_km = result.get('dist_km', 0)
+                DIST_HTML = (
+                    '<div style="text-align:center; margin-bottom: 8px;">'
+                    f'<span style="font-size:0.78rem; color:#64748B; font-weight:600;">'
+                    f'📏 직선거리 약 {dist_km}km</span>'
+                    '</div>'
+                )
+                st.html(DIST_HTML)
+
+                st.markdown("##### ⏱️ 예상 소요시간")
+
+                def time_card(key, emoji, label, time_text, is_selected):
+                    if is_selected:
+                        return (
+                            '<div style="background: #2563EB; '
+                            'border-radius: 10px; padding: 10px; text-align: center;">'
+                            f'<div style="font-size: 1.3rem;">{emoji}</div>'
+                            f'<div style="font-size: 0.7rem; color: rgba(255,255,255,0.9); font-weight: 600; margin-top: 2px;">{label}</div>'
+                            f'<div style="font-size: 0.95rem; font-weight: 800; color: white; margin-top: 3px;">{time_text}</div>'
+                            '</div>'
                         )
-                        st.html(TIP_HTML)
+                    else:
+                        return (
+                            '<div style="background: white; border: 2px solid #DBEAFE; '
+                            'border-radius: 10px; padding: 10px; text-align: center;">'
+                            f'<div style="font-size: 1.3rem;">{emoji}</div>'
+                            f'<div style="font-size: 0.7rem; color: #475569; font-weight: 600; margin-top: 2px;">{label}</div>'
+                            f'<div style="font-size: 0.95rem; font-weight: 800; color: #2563EB; margin-top: 3px;">{time_text}</div>'
+                            '</div>'
+                        )
 
-                    NOTICE_HTML = (
-                        '<div style="background: #DCFCE7; '
-                        'padding: 8px 11px; border-radius: 10px; '
-                        'font-size: 0.72rem; color: #166534; margin-bottom: 10px; line-height: 1.5;">'
-                        '✅ 정확한 정보는 카카오맵·네이버지도에서 확인하세요!'
-                        '</div>'
+                TIMES_HTML = (
+                    '<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px;">'
+                    + time_card("car", "🚗", "자동차", result.get("car", "-"), sel_transport == "car")
+                    + time_card("transit", "🚇", "대중교통", result.get("transit", "-"), sel_transport == "transit")
+                    + time_card("bicycle", "🚴", "자전거", result.get("bicycle", "-"), sel_transport == "bicycle")
+                    + time_card("walk", "🚶", "도보", result.get("walk", "-"), sel_transport == "walk")
+                    + '</div>'
+                )
+                st.html(TIMES_HTML)
+
+                tip = result.get('tip', '')
+                if tip:
+                    TIP_HTML = (
+                        '<div style="background: #FEF3C7; '
+                        'padding: 9px 12px; border-radius: 10px; '
+                        'border-left: 3px solid #F59E0B; margin-bottom: 10px;">'
+                        f'<div style="font-size: 0.78rem; color: #78350F; line-height: 1.5;">'
+                        f'💡 {tip}</div></div>'
                     )
-                    st.html(NOTICE_HTML)
+                    st.html(TIP_HTML)
 
-                except json.JSONDecodeError:
-                    st.error("결과 오류")
+                NOTICE_HTML = (
+                    '<div style="background: #DCFCE7; '
+                    'padding: 8px 11px; border-radius: 10px; '
+                    'font-size: 0.72rem; color: #166534; margin-bottom: 10px; line-height: 1.5;">'
+                    '✅ 자동차는 카카오맵 실제 경로 기반이에요. 대중교통·도보는 거리 기반 추정이니 카카오맵·네이버지도에서 정확히 확인하세요!'
+                    '</div>'
+                )
+                st.html(NOTICE_HTML)
 
+                if st.button("🔄 다시 계산하기", use_container_width=True, key="reanalyze_btn"):
+                    del st.session_state['commute_result']
+                    st.rerun()
+
+                st.markdown("<br>", unsafe_allow_html=True)
+
+            # 지도 바로가기 버튼
             start_enc = urllib.parse.quote(start_address)
-            end_enc = urllib.parse.quote(selected_center['address'])
+            center_addr = selected_center.get('address', selected_center['name'])
+            end_enc = urllib.parse.quote(center_addr)
             kakao_url = f"https://map.kakao.com/?sName={start_enc}&eName={end_enc}"
-
             naver_modes = {"car": "car", "transit": "transit", "bicycle": "bicycle", "walk": "walk"}
             naver_mode = naver_modes.get(sel_transport, "transit")
             naver_url = f"https://map.naver.com/p/directions/-/{end_enc}/{naver_mode}"
 
             col1, col2 = st.columns(2)
             with col1:
-                st.link_button("🗺️ 카카오맵", kakao_url, use_container_width=True)
+                st.link_button("🗺️ 카카오맵에서 확인", kakao_url, use_container_width=True)
             with col2:
-                st.link_button("🗺️ 네이버지도", naver_url, use_container_width=True)
+                st.link_button("🗺️ 네이버지도에서 확인", naver_url, use_container_width=True)
 
-            if st.session_state.get('commute_analysis'):
-                st.markdown("<br>", unsafe_allow_html=True)
-                if st.button("🔄 다시 분석하기", use_container_width=True, key="reanalyze_btn"):
-                    del st.session_state['commute_analysis']
-                    st.rerun()
         else:
             st.info("👆 출발지를 먼저 입력해주세요!")
 
